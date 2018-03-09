@@ -4,9 +4,14 @@ go:
   - "1.10"
   - "1.x"
 
+install:
+  - go get -t ./...
+  - go get golang.org/x/lint/golint
+
 script:
   - go test -v ./...
   - .travis/check-formatting.sh
+  - golint --set_exit_status ./...
 
 # In addition to pull requests, always build these branches
 branches:
