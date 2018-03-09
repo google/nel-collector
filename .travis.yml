@@ -4,6 +4,10 @@ go:
   - "1.10"
   - "1.x"
 
+script:
+  - go test -v ./...
+  - .travis/check-formatting.sh
+
 # In addition to pull requests, always build these branches
 branches:
   only:
