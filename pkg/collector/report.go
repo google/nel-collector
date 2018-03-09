@@ -18,24 +18,6 @@ import (
 	"encoding/json"
 )
 
-type rawReport struct {
-	Age        int             `json:"age"`
-	ReportType string          `json:"type"`
-	URL        string          `json:"url"`
-	Body       json.RawMessage `json:"body"`
-}
-
-type nelReportBody struct {
-	URI              string  `json:"uri"`
-	Referrer         string  `json:"referrer"`
-	SamplingFraction float32 `json:"sampling-fraction"`
-	ServerIP         string  `json:"server-ip"`
-	Protocol         string  `json:"protocol"`
-	StatusCode       int     `json:"status-code"`
-	ElapsedTime      int     `json:"elapsed-time"`
-	Type             string  `json:"type"`
-}
-
 // A NelReport describes a single network error report.
 //
 // (The name is a bit of a misnomer; it can also represent other report payloads
@@ -75,6 +57,24 @@ type NelReport struct {
 	// For non-NEL reports, this will contain the unparsed JSON content of
 	// the report's `body` field.
 	RawBody []byte
+}
+
+type rawReport struct {
+	Age        int             `json:"age"`
+	ReportType string          `json:"type"`
+	URL        string          `json:"url"`
+	Body       json.RawMessage `json:"body"`
+}
+
+type nelReportBody struct {
+	URI              string  `json:"uri"`
+	Referrer         string  `json:"referrer"`
+	SamplingFraction float32 `json:"sampling-fraction"`
+	ServerIP         string  `json:"server-ip"`
+	Protocol         string  `json:"protocol"`
+	StatusCode       int     `json:"status-code"`
+	ElapsedTime      int     `json:"elapsed-time"`
+	Type             string  `json:"type"`
 }
 
 // UnmarshalJSON unmarshals the JSON payload as defined by the Reporting and NEL

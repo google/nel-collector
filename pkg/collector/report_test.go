@@ -31,91 +31,95 @@ func compactJSON(b []byte) []byte {
 	return bytes.Bytes()
 }
 
+var jsonCases = []struct {
+	name   string
+	json   []byte
+	parsed []NelReport
+}{
+	{
+		"ValidNELReport",
+		[]byte(`[
+		  {
+		    "age": 500,
+		    "type": "network-error",
+		    "url": "https://example.com/about/",
+		    "body": {
+		      "uri": "https://example.com/about/",
+		      "referrer": "https://example.com/",
+		      "sampling-fraction": 0.5,
+		      "server-ip": "203.0.113.75",
+		      "protocol": "h2",
+		      "status-code": 200,
+		      "elapsed-time": 45,
+		      "type": "ok"
+				}
+		  }
+		]`),
+		[]NelReport{
+			NelReport{
+				Age:              500,
+				ReportType:       "network-error",
+				URL:              "https://example.com/about/",
+				Referrer:         "https://example.com/",
+				SamplingFraction: 0.5,
+				ServerIP:         "203.0.113.75",
+				Protocol:         "h2",
+				StatusCode:       200,
+				ElapsedTime:      45,
+				Type:             "ok",
+			},
+		},
+	},
+	{
+		"NonNELReport",
+		[]byte(`[
+		  {
+		    "age": 500,
+		    "type": "another-error",
+		    "url": "https://example.com/about/",
+		    "body": {"random": "stuff", "ignore": 100}
+		  }
+		]`),
+		[]NelReport{
+			NelReport{
+				Age:        500,
+				ReportType: "another-error",
+				URL:        "https://example.com/about/",
+				RawBody:    []byte(`{"random": "stuff", "ignore": 100}`),
+			},
+		},
+	},
+}
+
 func TestNelReport(t *testing.T) {
-	cases := []struct {
-		json   []byte
-		parsed []NelReport
-	}{
-		// A perfectly valid NEL report
-		{
-			[]byte(`[
-			  {
-			    "age": 500,
-			    "type": "network-error",
-			    "url": "https://example.com/about/",
-			    "body": {
-			      "uri": "https://example.com/about/",
-			      "referrer": "https://example.com/",
-			      "sampling-fraction": 0.5,
-			      "server-ip": "203.0.113.75",
-			      "protocol": "h2",
-			      "status-code": 200,
-			      "elapsed-time": 45,
-			      "type": "ok"
-			    }
-			  }
-			]`),
-			[]NelReport{
-				NelReport{
-					Age:              500,
-					ReportType:       "network-error",
-					URL:              "https://example.com/about/",
-					Referrer:         "https://example.com/",
-					SamplingFraction: 0.5,
-					ServerIP:         "203.0.113.75",
-					Protocol:         "h2",
-					StatusCode:       200,
-					ElapsedTime:      45,
-					Type:             "ok",
-				},
-			},
-		},
-
-		// We ignore the body if for non-NEL reports
-		{
-			[]byte(`[
-			  {
-			    "age": 500,
-			    "type": "another-error",
-			    "url": "https://example.com/about/",
-			    "body": {"random": "stuff", "ignore": 100}
-			  }
-			]`),
-			[]NelReport{
-				NelReport{
-					Age:        500,
-					ReportType: "another-error",
-					URL:        "https://example.com/about/",
-					RawBody:    []byte(`{"random": "stuff", "ignore": 100}`),
-				},
-			},
-		},
-	}
-
 	// First test unmarshaling
-	for _, c := range cases {
-		var got []NelReport
-		err := json.Unmarshal(c.json, &got)
-		if err != nil {
-			t.Errorf("json.Unmarshal(%s): %v", compactJSON(c.json), err)
-			continue
-		}
+	for _, c := range jsonCases {
+		t.Run("Unmarshal:"+c.name, func(t *testing.T) {
+			var got []NelReport
+			err := json.Unmarshal(c.json, &got)
+			if err != nil {
+				t.Errorf("json.Unmarshal(%s): %v", compactJSON(c.json), err)
+				return
+			}
 
-		if !cmp.Equal(got, c.parsed) {
-			t.Errorf("json.Unmarshal(%s) == %v, want %v", compactJSON(c.json), got, c.parsed)
-		}
+			if !cmp.Equal(got, c.parsed) {
+				t.Errorf("json.Unmarshal(%s) == %v, want %v", compactJSON(c.json), got, c.parsed)
+			}
+		})
 	}
 
 	// Then test marshaling
-	for _, c := range cases {
-		got, err := json.Marshal(c.parsed)
-		if err != nil {
-			t.Errorf("json.Marshal(%v): %v", c.parsed, err)
-			continue
-		}
+	for _, c := range jsonCases {
+		t.Run("Marshal:"+c.name, func(t *testing.T) {
+			got, err := json.Marshal(c.parsed)
+			if err != nil {
+				t.Errorf("json.Marshal(%v): %v", c.parsed, err)
+				return
+			}
 
-		if !cmp.Equal(compactJSON(got), compactJSON(c.json)) {
-			t.Errorf("json.Marshal(%v) == %s, want %s", c.parsed, compactJSON(got), compactJSON(c.json))
-		}
+			if !cmp.Equal(compactJSON(got), compactJSON(c.json)) {
+				t.Errorf("json.Marshal(%v) == %s, want %s", c.parsed, compactJSON(got), compactJSON(c.json))
+			}
+		})
 	}
 }
