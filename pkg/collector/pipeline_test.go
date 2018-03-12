@@ -41,6 +41,15 @@ var validNELReport = []byte(`[
 		  }
 		]`)
 
+var nonNELReport = []byte(`[
+		  {
+		    "age": 500,
+		    "type": "another-error",
+		    "url": "https://example.com/about/",
+		    "body": {"random": "stuff", "ignore": 100}
+		  }
+		]`)
+
 func TestIgnoreNonPOST(t *testing.T) {
 	pipeline := &Pipeline{}
 	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(validNELReport))
@@ -74,6 +83,11 @@ var dumpCases = []struct {
 		"ValidNELReport",
 		validNELReport,
 		[]byte("[ok] https://example.com/about/\n"),
+	},
+	{
+		"NonNELReport",
+		nonNELReport,
+		[]byte("<another-error> https://example.com/about/\n"),
 	},
 }
 

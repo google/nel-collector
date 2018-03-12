@@ -47,7 +47,11 @@ type ReportDumper struct {
 // ProcessReports prints out a summary of each report in the batch.
 func (d ReportDumper) ProcessReports(batch *ReportBatch) {
 	for _, report := range batch.Reports {
-		fmt.Fprintf(d.Writer, "[%s] %s\n", report.Type, report.URL)
+		if report.ReportType == "network-error" {
+			fmt.Fprintf(d.Writer, "[%s] %s\n", report.Type, report.URL)
+		} else {
+			fmt.Fprintf(d.Writer, "<%s> %s\n", report.ReportType, report.URL)
+		}
 	}
 }
 
