@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // ReportBatch is a collection of reports that should all be processed together.
@@ -26,6 +27,8 @@ import (
 // Certain processors might join batches together or split them up.
 type ReportBatch struct {
 	Reports []NelReport
+	// When this batch was received by the collector
+	Time time.Time
 }
 
 // A ReportProcessor implements one discrete processing step for handling
@@ -46,19 +49,42 @@ type ReportDumper struct {
 
 // ProcessReports prints out a summary of each report in the batch.
 func (d ReportDumper) ProcessReports(batch *ReportBatch) {
+	time := batch.Time.UTC().Format("2006-01-02 15:04:05.000")
 	for _, report := range batch.Reports {
 		if report.ReportType == "network-error" {
-			fmt.Fprintf(d.Writer, "[%s] %s\n", report.Type, report.URL)
+			fmt.Fprintf(d.Writer, "%s [%s] %s\n", time, report.Type, report.URL)
 		} else {
-			fmt.Fprintf(d.Writer, "<%s> %s\n", report.ReportType, report.URL)
+			fmt.Fprintf(d.Writer, "%s <%s> %s\n", time, report.ReportType, report.URL)
 		}
 	}
 }
+
+// Clock lets you override how a pipeline assigns timestamps to each report.
+// The default is to use time.Now; you can provide a custom implementation to
+// get reproducible timestamps in test cases.
+type Clock interface {
+	Now() time.Time
+}
+
+type nowClock struct{}
+
+func (c nowClock) Now() time.Time {
+	return time.Now()
+}
+
+var defaultClock nowClock
 
 // Pipeline is a series of processors that should be applied to each report that
 // the collector receives.
 type Pipeline struct {
 	processors []ReportProcessor
+	clock      Clock
+}
+
+// NewTestPipeline creates a Pipeline that will use a particular Clock to assign
+// times to each report batch, instead of using time.Now.
+func NewTestPipeline(clock Clock) *Pipeline {
+	return &Pipeline{clock: clock}
 }
 
 // AddProcessor adds a new processor to the pipeline.
@@ -80,7 +106,13 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clock := p.clock
+	if clock == nil {
+		clock = defaultClock
+	}
+
 	var reports ReportBatch
+	reports.Time = clock.Now()
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&reports.Reports)
 	if err != nil {

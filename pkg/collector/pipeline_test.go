@@ -19,9 +19,22 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
+
+type simulatedClock struct {
+	currentTime time.Time
+}
+
+func newSimulatedClock() *simulatedClock {
+	return &simulatedClock{currentTime: time.Unix(0, 0)}
+}
+
+func (c simulatedClock) Now() time.Time {
+	return c.currentTime
+}
 
 var validNELReport = []byte(`[
 		  {
@@ -51,7 +64,7 @@ var nonNELReport = []byte(`[
 		]`)
 
 func TestIgnoreNonPOST(t *testing.T) {
-	pipeline := &Pipeline{}
+	pipeline := NewTestPipeline(newSimulatedClock())
 	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(validNELReport))
 	request.Header.Add("Content-Type", "application/report")
 	var response httptest.ResponseRecorder
@@ -63,7 +76,7 @@ func TestIgnoreNonPOST(t *testing.T) {
 }
 
 func TestIgnoreWrongContentType(t *testing.T) {
-	pipeline := &Pipeline{}
+	pipeline := NewTestPipeline(newSimulatedClock())
 	request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(validNELReport))
 	request.Header.Add("Content-Type", "application/json")
 	var response httptest.ResponseRecorder
@@ -82,19 +95,19 @@ var dumpCases = []struct {
 	{
 		"ValidNELReport",
 		validNELReport,
-		[]byte("[ok] https://example.com/about/\n"),
+		[]byte("1970-01-01 00:00:00.000 [ok] https://example.com/about/\n"),
 	},
 	{
 		"NonNELReport",
 		nonNELReport,
-		[]byte("<another-error> https://example.com/about/\n"),
+		[]byte("1970-01-01 00:00:00.000 <another-error> https://example.com/about/\n"),
 	},
 }
 
 func TestDumpReports(t *testing.T) {
 	for _, c := range dumpCases {
 		t.Run("Dump:"+c.name, func(t *testing.T) {
-			pipeline := &Pipeline{}
+			pipeline := NewTestPipeline(newSimulatedClock())
 			var buffer bytes.Buffer
 			pipeline.AddProcessor(ReportDumper{&buffer})
 

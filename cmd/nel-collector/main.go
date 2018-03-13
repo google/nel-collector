@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// nel-collector runs a NEL collector on port 8080, printing out a summary of
+// each report that it receives.
 package main
 
 import (
