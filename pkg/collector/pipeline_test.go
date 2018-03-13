@@ -95,12 +95,12 @@ var dumpCases = []struct {
 	{
 		"ValidNELReport",
 		validNELReport,
-		[]byte("1970-01-01 00:00:00.000 [ok] https://example.com/about/\n"),
+		[]byte("192.0.2.1 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" 200 -\n"),
 	},
 	{
 		"NonNELReport",
 		nonNELReport,
-		[]byte("1970-01-01 00:00:00.000 <another-error> https://example.com/about/\n"),
+		[]byte("192.0.2.1 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" <another-error> -\n"),
 	},
 }
 
