@@ -36,36 +36,9 @@ func (c simulatedClock) Now() time.Time {
 	return c.currentTime
 }
 
-var validNELReport = []byte(`[
-		  {
-		    "age": 500,
-		    "type": "network-error",
-		    "url": "https://example.com/about/",
-		    "body": {
-		      "uri": "https://example.com/about/",
-		      "referrer": "https://example.com/",
-		      "sampling-fraction": 0.5,
-		      "server-ip": "203.0.113.75",
-		      "protocol": "h2",
-		      "status-code": 200,
-		      "elapsed-time": 45,
-		      "type": "ok"
-		    }
-		  }
-		]`)
-
-var nonNELReport = []byte(`[
-		  {
-		    "age": 500,
-		    "type": "another-error",
-		    "url": "https://example.com/about/",
-		    "body": {"random": "stuff", "ignore": 100}
-		  }
-		]`)
-
 func TestIgnoreNonPOST(t *testing.T) {
 	pipeline := NewTestPipeline(newSimulatedClock())
-	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(validNELReport))
+	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(testdata(t, "valid-nel-report.json")))
 	request.Header.Add("Content-Type", "application/report")
 	var response httptest.ResponseRecorder
 	pipeline.ServeHTTP(&response, request)
@@ -77,7 +50,7 @@ func TestIgnoreNonPOST(t *testing.T) {
 
 func TestIgnoreWrongContentType(t *testing.T) {
 	pipeline := NewTestPipeline(newSimulatedClock())
-	request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(validNELReport))
+	request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(testdata(t, "valid-nel-report.json")))
 	request.Header.Add("Content-Type", "application/json")
 	var response httptest.ResponseRecorder
 	pipeline.ServeHTTP(&response, request)
@@ -88,32 +61,32 @@ func TestIgnoreWrongContentType(t *testing.T) {
 }
 
 var dumpCases = []struct {
-	name    string
-	json    []byte
-	dumped  []byte
-	useIPv6 bool
+	name     string
+	jsonFile string
+	dumped   []byte
+	useIPv6  bool
 }{
 	{
 		"ValidNELReport",
-		validNELReport,
+		"valid-nel-report.json",
 		[]byte("192.0.2.1 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" 200 -\n"),
 		false,
 	},
 	{
 		"ValidNELReportIPv6",
-		validNELReport,
+		"valid-nel-report.json",
 		[]byte("2001:db8::2 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" 200 -\n"),
 		true,
 	},
 	{
 		"NonNELReport",
-		nonNELReport,
+		"non-nel-report.json",
 		[]byte("192.0.2.1 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" <another-error> -\n"),
 		false,
 	},
 	{
 		"NonNELReportIPv6",
-		nonNELReport,
+		"non-nel-report.json",
 		[]byte("2001:db8::2 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" <another-error> -\n"),
 		true,
 	},
@@ -125,8 +98,9 @@ func TestDumpReports(t *testing.T) {
 			pipeline := NewTestPipeline(newSimulatedClock())
 			var buffer bytes.Buffer
 			pipeline.AddProcessor(ReportDumper{&buffer})
+			json := testdata(t, c.jsonFile)
 
-			request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(c.json))
+			request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(json))
 			request.Header.Add("Content-Type", "application/report")
 			if c.useIPv6 {
 				request.RemoteAddr = "[2001:db8::2]:1234"
@@ -135,13 +109,13 @@ func TestDumpReports(t *testing.T) {
 			pipeline.ServeHTTP(&response, request)
 
 			if response.Code != http.StatusNoContent {
-				t.Errorf("ServeHTTP(%s): got %d, wanted %d", compactJSON(c.json), response.Code, http.StatusNoContent)
+				t.Errorf("ServeHTTP(%s): got %d, wanted %d", compactJSON(json), response.Code, http.StatusNoContent)
 				return
 			}
 
 			got := buffer.Bytes()
 			if !cmp.Equal(got, c.dumped) {
-				t.Errorf("ReportDumper(%s) == %s, wanted %s", compactJSON(c.json), got, c.dumped)
+				t.Errorf("ReportDumper(%s) == %s, wanted %s", compactJSON(json), got, c.dumped)
 				return
 			}
 		})

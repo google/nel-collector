@@ -15,46 +15,20 @@
 package collector
 
 import (
-	"bytes"
 	"encoding/json"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 )
 
-func compactJSON(b []byte) []byte {
-	var bytes bytes.Buffer
-	err := json.Compact(&bytes, b)
-	if err != nil {
-		return nil
-	}
-	return bytes.Bytes()
-}
-
 var jsonCases = []struct {
-	name   string
-	json   []byte
-	parsed []NelReport
+	name     string
+	jsonFile string
+	parsed   []NelReport
 }{
 	{
 		"ValidNELReport",
-		[]byte(`[
-		  {
-		    "age": 500,
-		    "type": "network-error",
-		    "url": "https://example.com/about/",
-		    "body": {
-		      "uri": "https://example.com/about/",
-		      "referrer": "https://example.com/",
-		      "sampling-fraction": 0.5,
-		      "server-ip": "203.0.113.75",
-		      "protocol": "h2",
-		      "status-code": 200,
-		      "elapsed-time": 45,
-		      "type": "ok"
-				}
-		  }
-		]`),
+		"valid-nel-report.json",
 		[]NelReport{
 			NelReport{
 				Age:              500,
@@ -72,14 +46,7 @@ var jsonCases = []struct {
 	},
 	{
 		"NonNELReport",
-		[]byte(`[
-		  {
-		    "age": 500,
-		    "type": "another-error",
-		    "url": "https://example.com/about/",
-		    "body": {"random": "stuff", "ignore": 100}
-		  }
-		]`),
+		"non-nel-report.json",
 		[]NelReport{
 			NelReport{
 				Age:        500,
@@ -95,15 +62,17 @@ func TestNelReport(t *testing.T) {
 	// First test unmarshaling
 	for _, c := range jsonCases {
 		t.Run("Unmarshal:"+c.name, func(t *testing.T) {
+			jsonData := testdata(t, c.jsonFile)
+
 			var got []NelReport
-			err := json.Unmarshal(c.json, &got)
+			err := json.Unmarshal(jsonData, &got)
 			if err != nil {
-				t.Errorf("json.Unmarshal(%s): %v", compactJSON(c.json), err)
+				t.Errorf("json.Unmarshal(%s): %v", compactJSON(jsonData), err)
 				return
 			}
 
 			if !cmp.Equal(got, c.parsed) {
-				t.Errorf("json.Unmarshal(%s) == %v, want %v", compactJSON(c.json), got, c.parsed)
+				t.Errorf("json.Unmarshal(%s) == %v, want %v", compactJSON(jsonData), got, c.parsed)
 			}
 		})
 	}
@@ -111,14 +80,16 @@ func TestNelReport(t *testing.T) {
 	// Then test marshaling
 	for _, c := range jsonCases {
 		t.Run("Marshal:"+c.name, func(t *testing.T) {
+			want := testdata(t, c.jsonFile)
+
 			got, err := json.Marshal(c.parsed)
 			if err != nil {
 				t.Errorf("json.Marshal(%v): %v", c.parsed, err)
 				return
 			}
 
-			if !cmp.Equal(compactJSON(got), compactJSON(c.json)) {
-				t.Errorf("json.Marshal(%v) == %s, want %s", c.parsed, compactJSON(got), compactJSON(c.json))
+			if !cmp.Equal(compactJSON(got), compactJSON(want)) {
+				t.Errorf("json.Marshal(%v) == %s, want %s", c.parsed, compactJSON(got), compactJSON(want))
 			}
 		})
 	}
