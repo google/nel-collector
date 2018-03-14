@@ -18,9 +18,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -35,7 +35,8 @@ type ReportBatch struct {
 
 	// The IP address of the client that uploaded the batch of reports.  You can
 	// typically assume that's the same IP address that was used for the original
-	// requests.
+	// requests.  The IP address will be encoded as a string; for example,
+	// "192.0.2.1" or "2001:db8::2".
 	ClientIP string
 
 	// The user agent of the client that uploaded the batch of reports.
@@ -123,6 +124,12 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	clock := p.clock
 	if clock == nil {
 		clock = defaultClock
@@ -130,10 +137,10 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var reports ReportBatch
 	reports.Time = clock.Now()
-	reports.ClientIP = strings.Split(r.RemoteAddr, ":")[0]
+	reports.ClientIP = host
 	reports.ClientUserAgent = r.Header.Get("User-Agent")
 	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&reports.Reports)
+	err = decoder.Decode(&reports.Reports)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

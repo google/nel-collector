@@ -88,19 +88,34 @@ func TestIgnoreWrongContentType(t *testing.T) {
 }
 
 var dumpCases = []struct {
-	name   string
-	json   []byte
-	dumped []byte
+	name    string
+	json    []byte
+	dumped  []byte
+	useIPv6 bool
 }{
 	{
 		"ValidNELReport",
 		validNELReport,
 		[]byte("192.0.2.1 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" 200 -\n"),
+		false,
+	},
+	{
+		"ValidNELReportIPv6",
+		validNELReport,
+		[]byte("2001:db8::2 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" 200 -\n"),
+		true,
 	},
 	{
 		"NonNELReport",
 		nonNELReport,
 		[]byte("192.0.2.1 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" <another-error> -\n"),
+		false,
+	},
+	{
+		"NonNELReportIPv6",
+		nonNELReport,
+		[]byte("2001:db8::2 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" <another-error> -\n"),
+		true,
 	},
 }
 
@@ -113,6 +128,9 @@ func TestDumpReports(t *testing.T) {
 
 			request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(c.json))
 			request.Header.Add("Content-Type", "application/report")
+			if c.useIPv6 {
+				request.RemoteAddr = "[2001:db8::2]:1234"
+			}
 			var response httptest.ResponseRecorder
 			pipeline.ServeHTTP(&response, request)
 
