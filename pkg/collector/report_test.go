@@ -21,6 +21,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// JSON marshalling and unmarshalling
+
 var jsonCases = []struct {
 	name     string
 	jsonFile string

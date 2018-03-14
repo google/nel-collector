@@ -1,0 +1,32 @@
+[
+  {
+    "age": 500,
+    "type": "network-error",
+    "url": "https://example.com/about/",
+    "body": {
+      "uri": "https://example.com/about/",
+      "referrer": "https://example.com/",
+      "sampling-fraction": 0.5,
+      "server-ip": "203.0.113.75",
+      "protocol": "h2",
+      "status-code": 200,
+      "elapsed-time": 45,
+      "type": "ok"
+    }
+  },
+  {
+    "age": 500,
+    "type": "network-error",
+    "url": "https://example.com/login/",
+    "body": {
+      "uri": "https://example.com/login/",
+      "referrer": "https://example.com/",
+      "sampling-fraction": 0.5,
+      "server-ip": "203.0.113.76",
+      "protocol": "h2",
+      "status-code": 200,
+      "elapsed-time": 45,
+      "type": "ok"
+    }
+  }
+]

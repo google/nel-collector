@@ -24,6 +24,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// Basic pipeline tests
+
 type simulatedClock struct {
 	currentTime time.Time
 }
@@ -119,5 +121,91 @@ func TestDumpReports(t *testing.T) {
 				return
 			}
 		})
+	}
+}
+
+// Custom annotations
+
+var clientCountries = map[string]string{
+	"192.0.2.1": "US",
+	"192.0.2.2": "CA",
+}
+
+var serverZones = map[string]string{
+	"203.0.113.75": "us-east1-a",
+	"203.0.113.76": "us-west1-b",
+}
+
+type geoAnnotator struct{}
+
+func (g geoAnnotator) ProcessReports(batch *ReportBatch) {
+	batch.Annotation = clientCountries[batch.ClientIP]
+	for i, _ := range batch.Reports {
+		batch.Reports[i].Annotation = serverZones[batch.Reports[i].ServerIP]
+	}
+}
+
+type stashReports struct {
+	dest *ReportBatch
+}
+
+func (s stashReports) ProcessReports(batch *ReportBatch) {
+	*s.dest = *batch
+}
+
+func TestCustomAnnotation(t *testing.T) {
+	var got ReportBatch
+	pipeline := NewTestPipeline(newSimulatedClock())
+	pipeline.AddProcessor(&geoAnnotator{})
+	pipeline.AddProcessor(&stashReports{&got})
+	json := testdata(t, "annotation-nel-reports.json")
+
+	request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(json))
+	request.Header.Add("Content-Type", "application/report")
+	var response httptest.ResponseRecorder
+	pipeline.ServeHTTP(&response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Errorf("ServeHTTP(%s): got %d, wanted %d", compactJSON(json), response.Code, http.StatusNoContent)
+		return
+	}
+
+	want := ReportBatch{
+		Time:       time.Unix(0, 0),
+		ClientIP:   "192.0.2.1",
+		Annotation: "US",
+		Reports: []NelReport{
+			NelReport{
+				Age:              500,
+				ReportType:       "network-error",
+				URL:              "https://example.com/about/",
+				Referrer:         "https://example.com/",
+				SamplingFraction: 0.5,
+				ServerIP:         "203.0.113.75",
+				Protocol:         "h2",
+				StatusCode:       200,
+				ElapsedTime:      45,
+				Type:             "ok",
+				Annotation:       "us-east1-a",
+			},
+			NelReport{
+				Age:              500,
+				ReportType:       "network-error",
+				URL:              "https://example.com/login/",
+				Referrer:         "https://example.com/",
+				SamplingFraction: 0.5,
+				ServerIP:         "203.0.113.76",
+				Protocol:         "h2",
+				StatusCode:       200,
+				ElapsedTime:      45,
+				Type:             "ok",
+				Annotation:       "us-west1-b",
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("ReportDumper(%s) == %v, wanted %v", compactJSON(json), got, want)
+		return
 	}
 }
