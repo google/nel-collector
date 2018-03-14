@@ -18,7 +18,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -27,8 +29,18 @@ import (
 // Certain processors might join batches together or split them up.
 type ReportBatch struct {
 	Reports []NelReport
+
 	// When this batch was received by the collector
 	Time time.Time
+
+	// The IP address of the client that uploaded the batch of reports.  You can
+	// typically assume that's the same IP address that was used for the original
+	// requests.  The IP address will be encoded as a string; for example,
+	// "192.0.2.1" or "2001:db8::2".
+	ClientIP string
+
+	// The user agent of the client that uploaded the batch of reports.
+	ClientUserAgent string
 }
 
 // A ReportProcessor implements one discrete processing step for handling
@@ -49,12 +61,18 @@ type ReportDumper struct {
 
 // ProcessReports prints out a summary of each report in the batch.
 func (d ReportDumper) ProcessReports(batch *ReportBatch) {
-	time := batch.Time.UTC().Format("2006-01-02 15:04:05.000")
+	time := batch.Time.UTC().Format("02/Jan/2006:15:04:05.000 -0700")
 	for _, report := range batch.Reports {
 		if report.ReportType == "network-error" {
-			fmt.Fprintf(d.Writer, "%s [%s] %s\n", time, report.Type, report.URL)
+			var result string
+			if report.Type == "ok" || report.Type == "http.error" {
+				result = strconv.Itoa(report.StatusCode)
+			} else {
+				result = report.Type
+			}
+			fmt.Fprintf(d.Writer, "%s - - [%s] \"GET %s\" %s -\n", batch.ClientIP, time, report.URL, result)
 		} else {
-			fmt.Fprintf(d.Writer, "%s <%s> %s\n", time, report.ReportType, report.URL)
+			fmt.Fprintf(d.Writer, "%s - - [%s] \"GET %s\" <%s> -\n", batch.ClientIP, time, report.URL, report.ReportType)
 		}
 	}
 }
@@ -106,6 +124,12 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	clock := p.clock
 	if clock == nil {
 		clock = defaultClock
@@ -113,8 +137,10 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var reports ReportBatch
 	reports.Time = clock.Now()
+	reports.ClientIP = host
+	reports.ClientUserAgent = r.Header.Get("User-Agent")
 	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&reports.Reports)
+	err = decoder.Decode(&reports.Reports)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
