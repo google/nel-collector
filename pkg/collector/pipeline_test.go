@@ -76,9 +76,9 @@ func TestDumpReports(t *testing.T) {
 			jsonFile := c.name + ".json"
 			var dumpedFile string
 			if c.useIPv6 {
-				dumpedFile = c.name + ".dumped.ipv6.json"
+				dumpedFile = c.name + ".dumped.ipv6.log"
 			} else {
-				dumpedFile = c.name + ".dumped.ipv4.json"
+				dumpedFile = c.name + ".dumped.ipv4.log"
 			}
 
 			pipeline := NewTestPipeline(newSimulatedClock())
