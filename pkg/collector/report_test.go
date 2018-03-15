@@ -49,7 +49,7 @@ func TestNelReport(t *testing.T) {
 			}
 
 			parsedReports := make([]ParsedNelReport, len(reports))
-			for i, _ := range reports {
+			for i := range reports {
 				parsedReports[i] = (ParsedNelReport)(reports[i])
 			}
 
@@ -81,7 +81,7 @@ func TestNelReport(t *testing.T) {
 			}
 
 			reports := make([]NelReport, len(parsedReports))
-			for i, _ := range parsedReports {
+			for i := range parsedReports {
 				reports[i] = (NelReport)(parsedReports[i])
 			}
 
