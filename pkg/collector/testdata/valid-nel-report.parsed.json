@@ -1,0 +1,15 @@
+[
+  {
+    "Age": 500,
+    "ReportType": "network-error",
+    "URL": "https://example.com/about/",
+    "Referrer": "https://example.com/",
+    "SamplingFraction": 0.5,
+    "ServerIP": "203.0.113.75",
+    "Protocol": "h2",
+    "StatusCode": 200,
+    "ElapsedTime": 45,
+    "Type": "ok",
+    "RawBody": null
+  }
+]

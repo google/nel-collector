@@ -21,58 +21,47 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-var jsonCases = []struct {
-	name     string
-	jsonFile string
-	parsed   []NelReport
-}{
-	{
-		"ValidNELReport",
-		"valid-nel-report.json",
-		[]NelReport{
-			NelReport{
-				Age:              500,
-				ReportType:       "network-error",
-				URL:              "https://example.com/about/",
-				Referrer:         "https://example.com/",
-				SamplingFraction: 0.5,
-				ServerIP:         "203.0.113.75",
-				Protocol:         "h2",
-				StatusCode:       200,
-				ElapsedTime:      45,
-				Type:             "ok",
-			},
-		},
-	},
-	{
-		"NonNELReport",
-		"non-nel-report.json",
-		[]NelReport{
-			NelReport{
-				Age:        500,
-				ReportType: "another-error",
-				URL:        "https://example.com/about/",
-				RawBody:    []byte(`{"random": "stuff", "ignore": 100}`),
-			},
-		},
-	},
+var jsonCases = []struct{ name string }{
+	{"valid-nel-report"},
+	{"non-nel-report"},
 }
 
 func TestNelReport(t *testing.T) {
+	// Note: when updating golden files, we assume that the "unparsed" file is
+	// canonical, and update the contents of the parsed file.
+
+	// This type alias lets us override our spec-aware JSON parsing rules, and
+	// dump out the content of a NelReport instance exactly as it looks in Go.
+	type ParsedNelReport NelReport
+
 	// First test unmarshaling
 	for _, c := range jsonCases {
 		t.Run("Unmarshal:"+c.name, func(t *testing.T) {
-			jsonData := testdata(t, c.jsonFile)
+			jsonFile := c.name + ".json"
+			parsedFile := c.name + ".parsed.json"
+			jsonData := testdata(t, jsonFile)
 
-			var got []NelReport
-			err := json.Unmarshal(jsonData, &got)
+			var reports []NelReport
+			err := json.Unmarshal(jsonData, &reports)
 			if err != nil {
-				t.Errorf("json.Unmarshal(%s): %v", compactJSON(jsonData), err)
+				t.Errorf("json.Unmarshal(%s): %v", c.name, err)
 				return
 			}
 
-			if !cmp.Equal(got, c.parsed) {
-				t.Errorf("json.Unmarshal(%s) == %v, want %v", compactJSON(jsonData), got, c.parsed)
+			parsedReports := make([]ParsedNelReport, len(reports))
+			for i, _ := range reports {
+				parsedReports[i] = (ParsedNelReport)(reports[i])
+			}
+
+			got, err := json.MarshalIndent(parsedReports, "", "  ")
+			if err != nil {
+				t.Errorf("json.Marshal(%s [parsed]): %v", c.name, err)
+				return
+			}
+
+			want := goldendata(t, parsedFile, got)
+			if !cmp.Equal(compactJSON(got), compactJSON(want)) {
+				t.Errorf("json.Unmarshal(%s) == %v, want %v", c.name, compactJSON(got), compactJSON(want))
 			}
 		})
 	}
@@ -80,16 +69,31 @@ func TestNelReport(t *testing.T) {
 	// Then test marshaling
 	for _, c := range jsonCases {
 		t.Run("Marshal:"+c.name, func(t *testing.T) {
-			want := testdata(t, c.jsonFile)
+			jsonFile := c.name + ".json"
+			parsedFile := c.name + ".parsed.json"
+			parsedData := testdata(t, parsedFile)
 
-			got, err := json.Marshal(c.parsed)
+			var parsedReports []ParsedNelReport
+			err := json.Unmarshal(parsedData, &parsedReports)
 			if err != nil {
-				t.Errorf("json.Marshal(%v): %v", c.parsed, err)
+				t.Errorf("json.Unmarshal(%s [parsed]): %v", c.name, err)
 				return
 			}
 
+			reports := make([]NelReport, len(parsedReports))
+			for i, _ := range parsedReports {
+				reports[i] = (NelReport)(parsedReports[i])
+			}
+
+			got, err := json.Marshal(reports)
+			if err != nil {
+				t.Errorf("json.Marshal(%s): %v", c.name, err)
+				return
+			}
+
+			want := testdata(t, jsonFile)
 			if !cmp.Equal(compactJSON(got), compactJSON(want)) {
-				t.Errorf("json.Marshal(%v) == %s, want %s", c.parsed, compactJSON(got), compactJSON(want))
+				t.Errorf("json.Marshal(%s) == %v, want %v", c.name, compactJSON(got), compactJSON(want))
 			}
 		})
 	}
