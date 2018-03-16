@@ -10,6 +10,7 @@
     "StatusCode": 0,
     "ElapsedTime": 0,
     "Type": "",
-    "RawBody": "eyJyYW5kb20iOiAic3R1ZmYiLCAiaWdub3JlIjogMTAwfQ=="
+    "RawBody": "eyJyYW5kb20iOiAic3R1ZmYiLCAiaWdub3JlIjogMTAwfQ==",
+    "Annotation": null
   }
 ]

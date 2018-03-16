@@ -24,12 +24,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// Basic pipeline tests
+
 type simulatedClock struct {
 	currentTime time.Time
 }
 
 func newSimulatedClock() *simulatedClock {
-	return &simulatedClock{currentTime: time.Unix(0, 0)}
+	return &simulatedClock{currentTime: time.Unix(0, 0).UTC()}
 }
 
 func (c simulatedClock) Now() time.Time {
@@ -103,6 +105,92 @@ func TestDumpReports(t *testing.T) {
 			want := goldendata(t, dumpedFile, got)
 			if !cmp.Equal(got, want) {
 				t.Errorf("ReportDumper(%s) == %s, wanted %s", compactJSON(json), got, want)
+				return
+			}
+		})
+	}
+}
+
+// Custom annotations
+
+var clientCountries = map[string]string{
+	"192.0.2.1": "US",
+	"192.0.2.2": "CA",
+}
+
+var serverZones = map[string]string{
+	"203.0.113.75": "us-east1-a",
+	"203.0.113.76": "us-west1-b",
+}
+
+type geoAnnotator struct{}
+
+func (g geoAnnotator) ProcessReports(batch *ReportBatch) {
+	batch.Annotation = clientCountries[batch.ClientIP]
+	for i := range batch.Reports {
+		batch.Reports[i].Annotation = serverZones[batch.Reports[i].ServerIP]
+	}
+}
+
+type stashReports struct {
+	dest *ReportBatch
+}
+
+func (s stashReports) ProcessReports(batch *ReportBatch) {
+	*s.dest = *batch
+}
+
+var annotateCases = []struct {
+	name    string
+	useIPv6 bool
+}{
+	{"valid-nel-report", false},
+	{"valid-nel-report", true},
+	{"non-nel-report", false},
+	{"non-nel-report", true},
+	{"multiple-valid-nel-reports", false},
+	{"multiple-valid-nel-reports", true},
+}
+
+func TestCustomAnnotation(t *testing.T) {
+	for _, c := range annotateCases {
+		t.Run("Annotate:"+c.name, func(t *testing.T) {
+			jsonFile := c.name + ".json"
+			var annotatedFile string
+			if c.useIPv6 {
+				annotatedFile = c.name + ".annotated.ipv6.json"
+			} else {
+				annotatedFile = c.name + ".annotated.ipv4.json"
+			}
+			jsonData := testdata(t, jsonFile)
+
+			var batch ReportBatch
+			pipeline := NewTestPipeline(newSimulatedClock())
+			pipeline.AddProcessor(&geoAnnotator{})
+			pipeline.AddProcessor(&stashReports{&batch})
+
+			request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(jsonData))
+			request.Header.Add("Content-Type", "application/report")
+			if c.useIPv6 {
+				request.RemoteAddr = "[2001:db8::2]:1234"
+			}
+			var response httptest.ResponseRecorder
+			pipeline.ServeHTTP(&response, request)
+
+			if response.Code != http.StatusNoContent {
+				t.Errorf("ServeHTTP(%s): got %d, wanted %d", c.name, response.Code, http.StatusNoContent)
+				return
+			}
+
+			got, err := encodeRawBatch(batch)
+			if err != nil {
+				t.Errorf("encodeRawBatch(%s): %v", c.name, err)
+				return
+			}
+
+			want := goldendata(t, annotatedFile, got)
+			if !cmp.Equal(got, want) {
+				t.Errorf("ReportDumper(%s) == %s, wanted %s", c.name, got, want)
 				return
 			}
 		})

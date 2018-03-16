@@ -57,6 +57,9 @@ type NelReport struct {
 	// For non-NEL reports, this will contain the unparsed JSON content of
 	// the report's `body` field.
 	RawBody []byte
+
+	// An arbitrary set of extra data that you can attach to your reports.
+	Annotation interface{}
 }
 
 type rawReport struct {

@@ -41,6 +41,10 @@ type ReportBatch struct {
 
 	// The user agent of the client that uploaded the batch of reports.
 	ClientUserAgent string
+
+	// An arbitrary set of extra data that you can attach to this batch of
+	// reports.
+	Annotation interface{}
 }
 
 // A ReportProcessor implements one discrete processing step for handling
