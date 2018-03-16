@@ -25,6 +25,15 @@ import (
 
 var update = flag.Bool("update", false, "update .golden files")
 
+// testFiles is a list of all of the test cases that have an input data file in
+// the testdata/ subdirectory.  The list should be in the order that you want
+// tests to be run; simpler or more basic test cases should appear first.
+var testFiles = []string{
+	"valid-nel-report",
+	"multiple-valid-nel-reports",
+	"non-nel-report",
+}
+
 // testdata loads the contents of a file in the testdata/ subdirectory.
 func testdata(t *testing.T, relPath string) []byte {
 	fullPath := filepath.Join("testdata", relPath)

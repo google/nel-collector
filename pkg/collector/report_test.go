@@ -23,65 +23,60 @@ import (
 
 // JSON marshalling and unmarshalling
 
-var jsonCases = []struct{ name string }{
-	{"valid-nel-report"},
-	{"non-nel-report"},
-}
-
 func TestNelReport(t *testing.T) {
 	// Note: when updating golden files, we assume that the "unparsed" file is
 	// canonical, and update the contents of the parsed file.
 
 	// First test unmarshaling
-	for _, c := range jsonCases {
-		t.Run("Unmarshal:"+c.name, func(t *testing.T) {
-			jsonFile := c.name + ".json"
-			parsedFile := c.name + ".parsed.json"
+	for _, name := range testFiles {
+		t.Run("Unmarshal:"+name, func(t *testing.T) {
+			jsonFile := name + ".json"
+			parsedFile := name + ".parsed.json"
 			jsonData := testdata(t, jsonFile)
 
 			var reports []NelReport
 			err := json.Unmarshal(jsonData, &reports)
 			if err != nil {
-				t.Errorf("json.Unmarshal(%s): %v", c.name, err)
+				t.Errorf("json.Unmarshal(%s): %v", name, err)
 				return
 			}
 
 			got, err := encodeRawReports(reports)
 			if err != nil {
-				t.Errorf("encodeRawReports(%s): %v", c.name, err)
+				t.Errorf("encodeRawReports(%s): %v", name, err)
 				return
 			}
 
 			want := goldendata(t, parsedFile, got)
 			if !cmp.Equal(compactJSON(got), compactJSON(want)) {
-				t.Errorf("json.Unmarshal(%s) == %s, want %s", c.name, compactJSON(got), compactJSON(want))
+				t.Errorf("json.Unmarshal(%s) == %s, want %s", name, compactJSON(got), compactJSON(want))
 			}
 		})
 	}
 
 	// Then test marshaling
-	for _, c := range jsonCases {
-		t.Run("Marshal:"+c.name, func(t *testing.T) {
-			jsonFile := c.name + ".json"
-			parsedFile := c.name + ".parsed.json"
+	for _, name := range testFiles {
+		t.Run("Marshal:"+name, func(t *testing.T) {
+			jsonFile := name + ".json"
+			parsedFile := name + ".parsed.json"
 			parsedData := testdata(t, parsedFile)
 
 			var reports []NelReport
 			err := decodeRawReports(parsedData, &reports)
 			if err != nil {
-				t.Errorf("decodeRawReports(%s): %v", c.name, err)
+				t.Errorf("decodeRawReports(%s): %v", name, err)
 				return
 			}
 
 			got, err := json.Marshal(reports)
 			if err != nil {
-				t.Errorf("json.Marshal(%s): %v", c.name, err)
+				t.Errorf("json.Marshal(%s): %v", name, err)
 				return
 			}
 
 			want := testdata(t, jsonFile)
 			if !cmp.Equal(compactJSON(got), compactJSON(want)) {
-				t.Errorf("json.Marshal(%s) == %s, want %s", c.name, compactJSON(got), compactJSON(want))
+				t.Errorf("json.Marshal(%s) == %s, want %s", name, compactJSON(got), compactJSON(want))
 			}
 		})
 	}
