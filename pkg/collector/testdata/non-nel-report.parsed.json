@@ -1,0 +1,15 @@
+[
+  {
+    "Age": 500,
+    "ReportType": "another-error",
+    "URL": "https://example.com/about/",
+    "Referrer": "",
+    "SamplingFraction": 0,
+    "ServerIP": "",
+    "Protocol": "",
+    "StatusCode": 0,
+    "ElapsedTime": 0,
+    "Type": "",
+    "RawBody": "eyJyYW5kb20iOiAic3R1ZmYiLCAiaWdub3JlIjogMTAwfQ=="
+  }
+]

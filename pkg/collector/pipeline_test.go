@@ -63,44 +63,30 @@ func TestIgnoreWrongContentType(t *testing.T) {
 }
 
 var dumpCases = []struct {
-	name     string
-	jsonFile string
-	dumped   []byte
-	useIPv6  bool
+	name    string
+	useIPv6 bool
 }{
-	{
-		"ValidNELReport",
-		"valid-nel-report.json",
-		[]byte("192.0.2.1 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" 200 -\n"),
-		false,
-	},
-	{
-		"ValidNELReportIPv6",
-		"valid-nel-report.json",
-		[]byte("2001:db8::2 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" 200 -\n"),
-		true,
-	},
-	{
-		"NonNELReport",
-		"non-nel-report.json",
-		[]byte("192.0.2.1 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" <another-error> -\n"),
-		false,
-	},
-	{
-		"NonNELReportIPv6",
-		"non-nel-report.json",
-		[]byte("2001:db8::2 - - [01/Jan/1970:00:00:00.000 +0000] \"GET https://example.com/about/\" <another-error> -\n"),
-		true,
-	},
+	{"valid-nel-report", false},
+	{"valid-nel-report", true},
+	{"non-nel-report", false},
+	{"non-nel-report", true},
 }
 
 func TestDumpReports(t *testing.T) {
 	for _, c := range dumpCases {
 		t.Run("Dump:"+c.name, func(t *testing.T) {
+			jsonFile := c.name + ".json"
+			var dumpedFile string
+			if c.useIPv6 {
+				dumpedFile = c.name + ".dumped.ipv6.log"
+			} else {
+				dumpedFile = c.name + ".dumped.ipv4.log"
+			}
+
 			pipeline := NewTestPipeline(newSimulatedClock())
 			var buffer bytes.Buffer
 			pipeline.AddProcessor(ReportDumper{&buffer})
-			json := testdata(t, c.jsonFile)
+			json := testdata(t, jsonFile)
 
 			request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(json))
 			request.Header.Add("Content-Type", "application/report")
@@ -116,8 +102,9 @@ func TestDumpReports(t *testing.T) {
 			}
 
 			got := buffer.Bytes()
-			if !cmp.Equal(got, c.dumped) {
-				t.Errorf("ReportDumper(%s) == %s, wanted %s", compactJSON(json), got, c.dumped)
+			want := goldendata(t, dumpedFile, got)
+			if !cmp.Equal(got, want) {
+				t.Errorf("ReportDumper(%s) == %s, wanted %s", compactJSON(json), got, want)
 				return
 			}
 		})

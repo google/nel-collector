@@ -17,14 +17,32 @@ package collector
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
 )
 
+var update = flag.Bool("update", false, "update .golden files")
+
 // testdata loads the contents of a file in the testdata/ subdirectory.
 func testdata(t *testing.T, relPath string) []byte {
 	fullPath := filepath.Join("testdata", relPath)
+	content, err := ioutil.ReadFile(fullPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return content
+}
+
+// goldendata loads the contents of a file in the testdata/ subdirectory,
+// updating the contents of the file first (with `got`) if the --update flag is
+// given.
+func goldendata(t *testing.T, relPath string, got []byte) []byte {
+	fullPath := filepath.Join("testdata", relPath)
+	if *update {
+		ioutil.WriteFile(fullPath, got, 0644)
+	}
 	content, err := ioutil.ReadFile(fullPath)
 	if err != nil {
 		t.Fatal(err)
