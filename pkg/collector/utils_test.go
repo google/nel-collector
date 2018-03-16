@@ -60,3 +60,37 @@ func compactJSON(b []byte) []byte {
 	}
 	return bytes.Bytes()
 }
+
+// encodeRawReports marshals an array of NelReports without using our custom
+// spec-aware JSON parsing rules, instead dumping out the content exactly as it
+// looks in Go.  This is used extensively in test cases to compare the results
+// of parsing and annotating against golden files.
+func encodeRawReports(reports []NelReport) ([]byte, error) {
+	// This type alias lets us override our spec-aware JSON parsing rules, and
+	// dump out the content of a NelReport instance exactly as it looks in Go.
+	type ParsedNelReport NelReport
+	parsedReports := make([]ParsedNelReport, len(reports))
+	for i := range reports {
+		parsedReports[i] = (ParsedNelReport)(reports[i])
+	}
+	return json.MarshalIndent(parsedReports, "", "  ")
+}
+
+// decodeRawReports unmarshals an array of NelReports without using our custom
+// spec-aware JSON parsing rules.  It's the inverse of encodeRawReports.
+func decodeRawReports(b []byte, reports *[]NelReport) error {
+	// This type alias lets us override our spec-aware JSON parsing rules, and
+	// dump out the content of a NelReport instance exactly as it looks in Go.
+	type ParsedNelReport NelReport
+	var parsedReports []ParsedNelReport
+	err := json.Unmarshal(b, &parsedReports)
+	if err != nil {
+		return err
+	}
+
+	*reports = make([]NelReport, len(parsedReports))
+	for i := range parsedReports {
+		(*reports)[i] = (NelReport)(parsedReports[i])
+	}
+	return nil
+}
