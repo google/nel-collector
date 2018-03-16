@@ -24,7 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-// Basic pipeline tests
+// Helpers
 
 type simulatedClock struct {
 	currentTime time.Time
@@ -38,73 +38,124 @@ func (c simulatedClock) Now() time.Time {
 	return c.currentTime
 }
 
-func TestIgnoreNonPOST(t *testing.T) {
-	pipeline := NewTestPipeline(newSimulatedClock())
-	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(testdata(t, "valid-nel-report.json")))
-	request.Header.Add("Content-Type", "application/report")
+type testPipeline struct {
+	name      string
+	ipVersion string
+	pipeline  *Pipeline
+}
+
+func newTestPipeline(name, ipVersion string) *testPipeline {
+	return &testPipeline{name, ipVersion, NewTestPipeline(newSimulatedClock())}
+}
+
+func (p *testPipeline) fullname() string {
+	return p.name + "." + p.ipVersion
+}
+
+func (p *testPipeline) testdataName(suffix string) string {
+	return p.name + suffix
+}
+
+func (p *testPipeline) ipdataName(suffix string) string {
+	return p.name + "." + p.ipVersion + suffix
+}
+
+func (p *testPipeline) handleCustomRequest(t *testing.T, method, mimeType string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(method, "https://example.com/upload/", bytes.NewReader(testdata(t, p.testdataName(".json"))))
+	request.Header.Add("Content-Type", mimeType)
+	if p.ipVersion == "ipv6" {
+		request.RemoteAddr = "[2001:db8::2]:1234"
+	}
 	var response httptest.ResponseRecorder
-	pipeline.ServeHTTP(&response, request)
+	p.pipeline.ServeHTTP(&response, request)
+	return &response
+}
+
+func (p *testPipeline) handleRequest(t *testing.T) bool {
+	response := p.handleCustomRequest(t, "POST", "application/report")
+	if response.Code != http.StatusNoContent {
+		t.Errorf("ServeHTTP(%s): got %d, wanted %d", p.fullname(), response.Code, http.StatusNoContent)
+		return false
+	}
+	return true
+}
+
+func allPipelineTests() []testPipeline {
+	result := make([]testPipeline, len(testFiles)*2)
+	for i := range testFiles {
+		result[i*2] = *newTestPipeline(testFiles[i], "ipv4")
+		result[i*2+1] = *newTestPipeline(testFiles[i], "ipv6")
+	}
+	return result
+}
+
+// Basic pipeline tests
+
+func TestIgnoreNonPOST(t *testing.T) {
+	pipeline := newTestPipeline("valid-nel-report", "")
+	response := pipeline.handleCustomRequest(t, "GET", "application/report")
 	if response.Code != http.StatusMethodNotAllowed {
-		t.Errorf("ServeHTTP(GET): got %d, wanted %d", response.Code, http.StatusMethodNotAllowed)
+		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusMethodNotAllowed)
 		return
 	}
 }
 
 func TestIgnoreWrongContentType(t *testing.T) {
-	pipeline := NewTestPipeline(newSimulatedClock())
-	request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(testdata(t, "valid-nel-report.json")))
-	request.Header.Add("Content-Type", "application/json")
-	var response httptest.ResponseRecorder
-	pipeline.ServeHTTP(&response, request)
+	pipeline := newTestPipeline("valid-nel-report", "")
+	response := pipeline.handleCustomRequest(t, "POST", "application/json")
 	if response.Code != http.StatusBadRequest {
-		t.Errorf("ServeHTTP(GET): got %d, wanted %d", response.Code, http.StatusBadRequest)
+		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusBadRequest)
 		return
 	}
 }
 
-var dumpCases = []struct {
-	name    string
-	useIPv6 bool
-}{
-	{"valid-nel-report", false},
-	{"valid-nel-report", true},
-	{"non-nel-report", false},
-	{"non-nel-report", true},
+type stashReports struct {
+	dest *ReportBatch
 }
 
+func (s stashReports) ProcessReports(batch *ReportBatch) {
+	*s.dest = *batch
+}
+
+func TestProcessReports(t *testing.T) {
+	for _, p := range allPipelineTests() {
+		t.Run("Process:"+p.fullname(), func(t *testing.T) {
+			var batch ReportBatch
+			p.pipeline.AddProcessor(&stashReports{&batch})
+			if !p.handleRequest(t) {
+				return
+			}
+
+			got, err := encodeRawBatch(batch)
+			if err != nil {
+				t.Errorf("encodeRawBatch(%s): %v", p.fullname(), err)
+				return
+			}
+
+			want := goldendata(t, p.ipdataName(".processed.json"), got)
+			if !cmp.Equal(got, want) {
+				t.Errorf("ReportDumper(%s) == %s, wanted %s", p.fullname(), got, want)
+				return
+			}
+		})
+	}
+}
+
+// CLF log dumping test cases
+
 func TestDumpReports(t *testing.T) {
-	for _, c := range dumpCases {
-		t.Run("Dump:"+c.name, func(t *testing.T) {
-			jsonFile := c.name + ".json"
-			var dumpedFile string
-			if c.useIPv6 {
-				dumpedFile = c.name + ".dumped.ipv6.log"
-			} else {
-				dumpedFile = c.name + ".dumped.ipv4.log"
-			}
-
-			pipeline := NewTestPipeline(newSimulatedClock())
+	for _, p := range allPipelineTests() {
+		t.Run("Dump:"+p.fullname(), func(t *testing.T) {
 			var buffer bytes.Buffer
-			pipeline.AddProcessor(ReportDumper{&buffer})
-			json := testdata(t, jsonFile)
-
-			request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(json))
-			request.Header.Add("Content-Type", "application/report")
-			if c.useIPv6 {
-				request.RemoteAddr = "[2001:db8::2]:1234"
-			}
-			var response httptest.ResponseRecorder
-			pipeline.ServeHTTP(&response, request)
-
-			if response.Code != http.StatusNoContent {
-				t.Errorf("ServeHTTP(%s): got %d, wanted %d", compactJSON(json), response.Code, http.StatusNoContent)
+			p.pipeline.AddProcessor(ReportDumper{&buffer})
+			if !p.handleRequest(t) {
 				return
 			}
 
 			got := buffer.Bytes()
-			want := goldendata(t, dumpedFile, got)
+			want := goldendata(t, p.ipdataName(".dumped.log"), got)
 			if !cmp.Equal(got, want) {
-				t.Errorf("ReportDumper(%s) == %s, wanted %s", compactJSON(json), got, want)
+				t.Errorf("ReportDumper(%s) == %s, wanted %s", p.fullname(), got, want)
 				return
 			}
 		})
@@ -132,65 +183,25 @@ func (g geoAnnotator) ProcessReports(batch *ReportBatch) {
 	}
 }
 
-type stashReports struct {
-	dest *ReportBatch
-}
-
-func (s stashReports) ProcessReports(batch *ReportBatch) {
-	*s.dest = *batch
-}
-
-var annotateCases = []struct {
-	name    string
-	useIPv6 bool
-}{
-	{"valid-nel-report", false},
-	{"valid-nel-report", true},
-	{"non-nel-report", false},
-	{"non-nel-report", true},
-	{"multiple-valid-nel-reports", false},
-	{"multiple-valid-nel-reports", true},
-}
-
 func TestCustomAnnotation(t *testing.T) {
-	for _, c := range annotateCases {
-		t.Run("Annotate:"+c.name, func(t *testing.T) {
-			jsonFile := c.name + ".json"
-			var annotatedFile string
-			if c.useIPv6 {
-				annotatedFile = c.name + ".annotated.ipv6.json"
-			} else {
-				annotatedFile = c.name + ".annotated.ipv4.json"
-			}
-			jsonData := testdata(t, jsonFile)
-
+	for _, p := range allPipelineTests() {
+		t.Run("Annotate:"+p.fullname(), func(t *testing.T) {
 			var batch ReportBatch
-			pipeline := NewTestPipeline(newSimulatedClock())
-			pipeline.AddProcessor(&geoAnnotator{})
-			pipeline.AddProcessor(&stashReports{&batch})
-
-			request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(jsonData))
-			request.Header.Add("Content-Type", "application/report")
-			if c.useIPv6 {
-				request.RemoteAddr = "[2001:db8::2]:1234"
-			}
-			var response httptest.ResponseRecorder
-			pipeline.ServeHTTP(&response, request)
-
-			if response.Code != http.StatusNoContent {
-				t.Errorf("ServeHTTP(%s): got %d, wanted %d", c.name, response.Code, http.StatusNoContent)
+			p.pipeline.AddProcessor(&geoAnnotator{})
+			p.pipeline.AddProcessor(&stashReports{&batch})
+			if !p.handleRequest(t) {
 				return
 			}
 
 			got, err := encodeRawBatch(batch)
 			if err != nil {
-				t.Errorf("encodeRawBatch(%s): %v", c.name, err)
+				t.Errorf("encodeRawBatch(%s): %v", p.fullname(), err)
 				return
 			}
 
-			want := goldendata(t, annotatedFile, got)
+			want := goldendata(t, p.ipdataName(".annotated.json"), got)
 			if !cmp.Equal(got, want) {
-				t.Errorf("ReportDumper(%s) == %s, wanted %s", c.name, got, want)
+				t.Errorf("ReportDumper(%s) == %s, wanted %s", p.fullname(), got, want)
 				return
 			}
 		})
