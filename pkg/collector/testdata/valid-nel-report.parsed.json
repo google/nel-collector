@@ -10,6 +10,7 @@
     "StatusCode": 200,
     "ElapsedTime": 45,
     "Type": "ok",
-    "RawBody": null
+    "RawBody": null,
+    "Annotation": null
   }
 ]
