@@ -15,95 +15,53 @@
 package collector
 
 import (
-	"bytes"
 	"encoding/json"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 )
 
-func compactJSON(b []byte) []byte {
-	var bytes bytes.Buffer
-	err := json.Compact(&bytes, b)
-	if err != nil {
-		return nil
-	}
-	return bytes.Bytes()
-}
-
-var jsonCases = []struct {
-	name   string
-	json   []byte
-	parsed []NelReport
-}{
-	{
-		"ValidNELReport",
-		[]byte(`[
-		  {
-		    "age": 500,
-		    "type": "network-error",
-		    "url": "https://example.com/about/",
-		    "body": {
-		      "uri": "https://example.com/about/",
-		      "referrer": "https://example.com/",
-		      "sampling-fraction": 0.5,
-		      "server-ip": "203.0.113.75",
-		      "protocol": "h2",
-		      "status-code": 200,
-		      "elapsed-time": 45,
-		      "type": "ok"
-				}
-		  }
-		]`),
-		[]NelReport{
-			NelReport{
-				Age:              500,
-				ReportType:       "network-error",
-				URL:              "https://example.com/about/",
-				Referrer:         "https://example.com/",
-				SamplingFraction: 0.5,
-				ServerIP:         "203.0.113.75",
-				Protocol:         "h2",
-				StatusCode:       200,
-				ElapsedTime:      45,
-				Type:             "ok",
-			},
-		},
-	},
-	{
-		"NonNELReport",
-		[]byte(`[
-		  {
-		    "age": 500,
-		    "type": "another-error",
-		    "url": "https://example.com/about/",
-		    "body": {"random": "stuff", "ignore": 100}
-		  }
-		]`),
-		[]NelReport{
-			NelReport{
-				Age:        500,
-				ReportType: "another-error",
-				URL:        "https://example.com/about/",
-				RawBody:    []byte(`{"random": "stuff", "ignore": 100}`),
-			},
-		},
-	},
+var jsonCases = []struct{ name string }{
+	{"valid-nel-report"},
+	{"non-nel-report"},
 }
 
 func TestNelReport(t *testing.T) {
+	// Note: when updating golden files, we assume that the "unparsed" file is
+	// canonical, and update the contents of the parsed file.
+
+	// This type alias lets us override our spec-aware JSON parsing rules, and
+	// dump out the content of a NelReport instance exactly as it looks in Go.
+	type ParsedNelReport NelReport
+
 	// First test unmarshaling
 	for _, c := range jsonCases {
 		t.Run("Unmarshal:"+c.name, func(t *testing.T) {
-			var got []NelReport
-			err := json.Unmarshal(c.json, &got)
+			jsonFile := c.name + ".json"
+			parsedFile := c.name + ".parsed.json"
+			jsonData := testdata(t, jsonFile)
+
+			var reports []NelReport
+			err := json.Unmarshal(jsonData, &reports)
 			if err != nil {
-				t.Errorf("json.Unmarshal(%s): %v", compactJSON(c.json), err)
+				t.Errorf("json.Unmarshal(%s): %v", c.name, err)
 				return
 			}
 
-			if !cmp.Equal(got, c.parsed) {
-				t.Errorf("json.Unmarshal(%s) == %v, want %v", compactJSON(c.json), got, c.parsed)
+			parsedReports := make([]ParsedNelReport, len(reports))
+			for i := range reports {
+				parsedReports[i] = (ParsedNelReport)(reports[i])
+			}
+
+			got, err := json.MarshalIndent(parsedReports, "", "  ")
+			if err != nil {
+				t.Errorf("json.Marshal(%s [parsed]): %v", c.name, err)
+				return
+			}
+
+			want := goldendata(t, parsedFile, got)
+			if !cmp.Equal(compactJSON(got), compactJSON(want)) {
+				t.Errorf("json.Unmarshal(%s) == %v, want %v", c.name, compactJSON(got), compactJSON(want))
 			}
 		})
 	}
@@ -111,14 +69,31 @@ func TestNelReport(t *testing.T) {
 	// Then test marshaling
 	for _, c := range jsonCases {
 		t.Run("Marshal:"+c.name, func(t *testing.T) {
-			got, err := json.Marshal(c.parsed)
+			jsonFile := c.name + ".json"
+			parsedFile := c.name + ".parsed.json"
+			parsedData := testdata(t, parsedFile)
+
+			var parsedReports []ParsedNelReport
+			err := json.Unmarshal(parsedData, &parsedReports)
 			if err != nil {
-				t.Errorf("json.Marshal(%v): %v", c.parsed, err)
+				t.Errorf("json.Unmarshal(%s [parsed]): %v", c.name, err)
 				return
 			}
 
-			if !cmp.Equal(compactJSON(got), compactJSON(c.json)) {
-				t.Errorf("json.Marshal(%v) == %s, want %s", c.parsed, compactJSON(got), compactJSON(c.json))
+			reports := make([]NelReport, len(parsedReports))
+			for i := range parsedReports {
+				reports[i] = (NelReport)(parsedReports[i])
+			}
+
+			got, err := json.Marshal(reports)
+			if err != nil {
+				t.Errorf("json.Marshal(%s): %v", c.name, err)
+				return
+			}
+
+			want := testdata(t, jsonFile)
+			if !cmp.Equal(compactJSON(got), compactJSON(want)) {
+				t.Errorf("json.Marshal(%s) == %v, want %v", c.name, compactJSON(got), compactJSON(want))
 			}
 		})
 	}

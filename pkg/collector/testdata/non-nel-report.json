@@ -1,0 +1,8 @@
+[
+  {
+    "age": 500,
+    "type": "another-error",
+    "url": "https://example.com/about/",
+    "body": {"random": "stuff", "ignore": 100}
+  }
+]
