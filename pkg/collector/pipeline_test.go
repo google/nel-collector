@@ -109,6 +109,38 @@ func TestIgnoreWrongContentType(t *testing.T) {
 	}
 }
 
+type stashReports struct {
+	dest *ReportBatch
+}
+
+func (s stashReports) ProcessReports(batch *ReportBatch) {
+	*s.dest = *batch
+}
+
+func TestProcessReports(t *testing.T) {
+	for _, p := range allPipelineTests() {
+		t.Run("Process:"+p.fullname(), func(t *testing.T) {
+			var batch ReportBatch
+			p.pipeline.AddProcessor(&stashReports{&batch})
+			if !p.handleRequest(t) {
+				return
+			}
+
+			got, err := encodeRawBatch(batch)
+			if err != nil {
+				t.Errorf("encodeRawBatch(%s): %v", p.fullname(), err)
+				return
+			}
+
+			want := goldendata(t, p.ipdataName(".processed.json"), got)
+			if !cmp.Equal(got, want) {
+				t.Errorf("ReportDumper(%s) == %s, wanted %s", p.fullname(), got, want)
+				return
+			}
+		})
+	}
+}
+
 // CLF log dumping test cases
 
 func TestDumpReports(t *testing.T) {
@@ -149,14 +181,6 @@ func (g geoAnnotator) ProcessReports(batch *ReportBatch) {
 	for i := range batch.Reports {
 		batch.Reports[i].Annotation = serverZones[batch.Reports[i].ServerIP]
 	}
-}
-
-type stashReports struct {
-	dest *ReportBatch
-}
-
-func (s stashReports) ProcessReports(batch *ReportBatch) {
-	*s.dest = *batch
 }
 
 func TestCustomAnnotation(t *testing.T) {
