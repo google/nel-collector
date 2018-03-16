@@ -74,7 +74,7 @@ func (p *testPipeline) handleCustomRequest(t *testing.T, method, mimeType string
 func (p *testPipeline) handleRequest(t *testing.T) bool {
 	response := p.handleCustomRequest(t, "POST", "application/report")
 	if response.Code != http.StatusNoContent {
-		t.Errorf("ServeHTTP(%s): got %d, wanted %d", p.fullname(), p.ipVersion, response.Code, http.StatusNoContent)
+		t.Errorf("ServeHTTP(%s): got %d, wanted %d", p.fullname(), response.Code, http.StatusNoContent)
 		return false
 	}
 	return true
