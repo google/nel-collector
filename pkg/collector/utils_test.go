@@ -94,3 +94,22 @@ func decodeRawReports(b []byte, reports *[]NelReport) error {
 	}
 	return nil
 }
+
+// encodeRawBatch marshals a batch of NelReports, including any custom
+// annotations, without using our custom spec-aware JSON parsing rules.
+func encodeRawBatch(batch ReportBatch) ([]byte, error) {
+	var err error
+	var rawBatch struct {
+		ReportBatch
+		RawReports json.RawMessage `json:"Reports"`
+	}
+
+	rawBatch.ReportBatch = batch
+	rawBatch.RawReports, err = encodeRawReports(rawBatch.Reports)
+	if err != nil {
+		return nil, err
+	}
+
+	rawBatch.Reports = nil
+	return json.MarshalIndent(rawBatch, "", "  ")
+}

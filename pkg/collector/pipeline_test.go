@@ -31,7 +31,7 @@ type simulatedClock struct {
 }
 
 func newSimulatedClock() *simulatedClock {
-	return &simulatedClock{currentTime: time.Unix(0, 0)}
+	return &simulatedClock{currentTime: time.Unix(0, 0).UTC()}
 }
 
 func (c simulatedClock) Now() time.Time {
@@ -127,7 +127,7 @@ type geoAnnotator struct{}
 
 func (g geoAnnotator) ProcessReports(batch *ReportBatch) {
 	batch.Annotation = clientCountries[batch.ClientIP]
-	for i, _ := range batch.Reports {
+	for i := range batch.Reports {
 		batch.Reports[i].Annotation = serverZones[batch.Reports[i].ServerIP]
 	}
 }
@@ -140,59 +140,59 @@ func (s stashReports) ProcessReports(batch *ReportBatch) {
 	*s.dest = *batch
 }
 
+var annotateCases = []struct {
+	name    string
+	useIPv6 bool
+}{
+	{"valid-nel-report", false},
+	{"valid-nel-report", true},
+	{"non-nel-report", false},
+	{"non-nel-report", true},
+	{"multiple-valid-nel-reports", false},
+	{"multiple-valid-nel-reports", true},
+}
+
 func TestCustomAnnotation(t *testing.T) {
-	var got ReportBatch
-	pipeline := NewTestPipeline(newSimulatedClock())
-	pipeline.AddProcessor(&geoAnnotator{})
-	pipeline.AddProcessor(&stashReports{&got})
-	json := testdata(t, "annotation-nel-reports.json")
+	for _, c := range annotateCases {
+		t.Run("Annotate:"+c.name, func(t *testing.T) {
+			jsonFile := c.name + ".json"
+			var annotatedFile string
+			if c.useIPv6 {
+				annotatedFile = c.name + ".annotated.ipv6.json"
+			} else {
+				annotatedFile = c.name + ".annotated.ipv4.json"
+			}
+			jsonData := testdata(t, jsonFile)
 
-	request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(json))
-	request.Header.Add("Content-Type", "application/report")
-	var response httptest.ResponseRecorder
-	pipeline.ServeHTTP(&response, request)
+			var batch ReportBatch
+			pipeline := NewTestPipeline(newSimulatedClock())
+			pipeline.AddProcessor(&geoAnnotator{})
+			pipeline.AddProcessor(&stashReports{&batch})
 
-	if response.Code != http.StatusNoContent {
-		t.Errorf("ServeHTTP(%s): got %d, wanted %d", compactJSON(json), response.Code, http.StatusNoContent)
-		return
-	}
+			request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(jsonData))
+			request.Header.Add("Content-Type", "application/report")
+			if c.useIPv6 {
+				request.RemoteAddr = "[2001:db8::2]:1234"
+			}
+			var response httptest.ResponseRecorder
+			pipeline.ServeHTTP(&response, request)
 
-	want := ReportBatch{
-		Time:       time.Unix(0, 0),
-		ClientIP:   "192.0.2.1",
-		Annotation: "US",
-		Reports: []NelReport{
-			NelReport{
-				Age:              500,
-				ReportType:       "network-error",
-				URL:              "https://example.com/about/",
-				Referrer:         "https://example.com/",
-				SamplingFraction: 0.5,
-				ServerIP:         "203.0.113.75",
-				Protocol:         "h2",
-				StatusCode:       200,
-				ElapsedTime:      45,
-				Type:             "ok",
-				Annotation:       "us-east1-a",
-			},
-			NelReport{
-				Age:              500,
-				ReportType:       "network-error",
-				URL:              "https://example.com/login/",
-				Referrer:         "https://example.com/",
-				SamplingFraction: 0.5,
-				ServerIP:         "203.0.113.76",
-				Protocol:         "h2",
-				StatusCode:       200,
-				ElapsedTime:      45,
-				Type:             "ok",
-				Annotation:       "us-west1-b",
-			},
-		},
-	}
+			if response.Code != http.StatusNoContent {
+				t.Errorf("ServeHTTP(%s): got %d, wanted %d", c.name, response.Code, http.StatusNoContent)
+				return
+			}
 
-	if !cmp.Equal(got, want) {
-		t.Errorf("ReportDumper(%s) == %v, wanted %v", compactJSON(json), got, want)
-		return
+			got, err := encodeRawBatch(batch)
+			if err != nil {
+				t.Errorf("encodeRawBatch(%s): %v", c.name, err)
+				return
+			}
+
+			want := goldendata(t, annotatedFile, got)
+			if !cmp.Equal(got, want) {
+				t.Errorf("ReportDumper(%s) == %s, wanted %s", c.name, got, want)
+				return
+			}
+		})
 	}
 }

@@ -1,0 +1,36 @@
+{
+  "Time": "1970-01-01T00:00:00Z",
+  "ClientIP": "2001:db8::2",
+  "ClientUserAgent": "",
+  "Annotation": "",
+  "Reports": [
+    {
+      "Age": 500,
+      "ReportType": "network-error",
+      "URL": "https://example.com/about/",
+      "Referrer": "https://example.com/",
+      "SamplingFraction": 0.5,
+      "ServerIP": "203.0.113.75",
+      "Protocol": "h2",
+      "StatusCode": 200,
+      "ElapsedTime": 45,
+      "Type": "ok",
+      "RawBody": null,
+      "Annotation": "us-east1-a"
+    },
+    {
+      "Age": 500,
+      "ReportType": "network-error",
+      "URL": "https://example.com/login/",
+      "Referrer": "https://example.com/",
+      "SamplingFraction": 0.5,
+      "ServerIP": "203.0.113.76",
+      "Protocol": "h2",
+      "StatusCode": 200,
+      "ElapsedTime": 45,
+      "Type": "ok",
+      "RawBody": null,
+      "Annotation": "us-west1-b"
+    }
+  ]
+}
