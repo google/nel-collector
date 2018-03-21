@@ -17,7 +17,8 @@ package collector
 // KeepNelReports is a pipeline processor that throws away any non-NEL reports.
 type KeepNelReports struct{}
 
-func (_ KeepNelReports) ProcessReports(batch *ReportBatch) {
+// ProcessReports throws away any non-NEL reports.
+func (KeepNelReports) ProcessReports(batch *ReportBatch) {
 	var filtered []NelReport
 	for _, report := range batch.Reports {
 		if report.ReportType == "network-error" {
