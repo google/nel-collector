@@ -1,5 +1,16 @@
 {
   "Time": "1970-01-01T00:00:00Z",
+  "CollectorURL": {
+    "Scheme": "https",
+    "Opaque": "",
+    "User": null,
+    "Host": "example.com",
+    "Path": "/upload/",
+    "RawPath": "",
+    "ForceQuery": false,
+    "RawQuery": "",
+    "Fragment": ""
+  },
   "ClientIP": "2001:db8::2",
   "ClientUserAgent": "",
   "Annotation": "",
