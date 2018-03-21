@@ -20,6 +20,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -32,6 +33,9 @@ type ReportBatch struct {
 
 	// When this batch was received by the collector
 	Time time.Time
+
+	// The URL that was used to upload the report.
+	CollectorURL url.URL
 
 	// The IP address of the client that uploaded the batch of reports.  You can
 	// typically assume that's the same IP address that was used for the original
@@ -141,6 +145,7 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var reports ReportBatch
 	reports.Time = clock.Now()
+	reports.CollectorURL = *r.URL
 	reports.ClientIP = host
 	reports.ClientUserAgent = r.Header.Get("User-Agent")
 	decoder := json.NewDecoder(r.Body)
