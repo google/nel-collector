@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector
+package collector_test
 
 import (
 	"encoding/json"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/nel-collector/pkg/collector"
 )
 
 // JSON marshalling and unmarshalling
@@ -34,7 +35,7 @@ func TestNelReport(t *testing.T) {
 			parsedFile := name + ".parsed.json"
 			jsonData := testdata(t, jsonFile)
 
-			var reports []NelReport
+			var reports []collector.NelReport
 			err := json.Unmarshal(jsonData, &reports)
 			if err != nil {
 				t.Errorf("json.Unmarshal(%s): %v", name, err)
@@ -61,7 +62,7 @@ func TestNelReport(t *testing.T) {
 			parsedFile := name + ".parsed.json"
 			parsedData := testdata(t, parsedFile)
 
-			var reports []NelReport
+			var reports []collector.NelReport
 			err := decodeRawReports(parsedData, &reports)
 			if err != nil {
 				t.Errorf("decodeRawReports(%s): %v", name, err)
