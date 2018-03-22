@@ -81,19 +81,11 @@ func TestIgnoreWrongContentType(t *testing.T) {
 	}
 }
 
-type stashReports struct {
-	dest *collector.ReportBatch
-}
-
-func (s stashReports) ProcessReports(batch *collector.ReportBatch) {
-	*s.dest = *batch
-}
-
 func TestProcessReports(t *testing.T) {
 	for _, p := range allPipelineTests() {
 		t.Run("Process:"+p.fullname(), func(t *testing.T) {
 			var batch collector.ReportBatch
-			p.AddProcessor(&stashReports{&batch})
+			p.AddProcessor(&pipelinetest.StashReports{&batch})
 			err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
 			if err != nil {
 				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
@@ -164,7 +156,7 @@ func TestCustomAnnotation(t *testing.T) {
 		t.Run("Annotate:"+p.fullname(), func(t *testing.T) {
 			var batch collector.ReportBatch
 			p.AddProcessor(&geoAnnotator{})
-			p.AddProcessor(&stashReports{&batch})
+			p.AddProcessor(&pipelinetest.StashReports{&batch})
 			err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
 			if err != nil {
 				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)

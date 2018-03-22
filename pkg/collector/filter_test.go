@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/nel-collector/pkg/collector"
+	"github.com/google/nel-collector/pkg/pipelinetest"
 )
 
 func TestKeepNelReports(t *testing.T) {
@@ -26,7 +27,7 @@ func TestKeepNelReports(t *testing.T) {
 		t.Run("KeepNelReports:"+p.fullname(), func(t *testing.T) {
 			var batch collector.ReportBatch
 			p.AddProcessor(&collector.KeepNelReports{})
-			p.AddProcessor(&stashReports{&batch})
+			p.AddProcessor(&pipelinetest.StashReports{&batch})
 			err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
 			if err != nil {
 				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)

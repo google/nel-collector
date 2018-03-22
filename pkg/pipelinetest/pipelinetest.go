@@ -79,3 +79,16 @@ func (p *TestPipeline) HandleRequest(t *testing.T, payload []byte) error {
 	}
 	return nil
 }
+
+// StashReports is a pipeline processor that saves a copy of the report batch
+// into some other variable under your control.  You can use this to verify the
+// contents of the batch after the pipeline is done.
+type StashReports struct {
+	Dest *collector.ReportBatch
+}
+
+// ProcessReports saves a copy of the report batch into some other variable
+// under your control.
+func (s StashReports) ProcessReports(batch *collector.ReportBatch) {
+	*s.Dest = *batch
+}
