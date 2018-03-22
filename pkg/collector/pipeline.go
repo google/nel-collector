@@ -107,9 +107,10 @@ type Pipeline struct {
 	clock      Clock
 }
 
-// NewTestPipeline creates a Pipeline that will use a particular Clock to assign
-// times to each report batch, instead of using time.Now.
-func NewTestPipeline(clock Clock) *Pipeline {
+// NewPipeline creates a new Pipeline that uses a particular clock.  For
+// production pipelines, just instantiate the Pipeline type yourself
+// (&Pipeline{}).
+func NewPipeline(clock Clock) *Pipeline {
 	return &Pipeline{clock: clock}
 }
 

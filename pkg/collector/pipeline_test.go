@@ -17,75 +17,46 @@ package collector_test
 import (
 	"bytes"
 	"net/http"
-	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/nel-collector/pkg/collector"
+	"github.com/google/nel-collector/pkg/pipelinetest"
 )
 
 // Helpers
 
-type simulatedClock struct {
-	currentTime time.Time
-}
-
-func newSimulatedClock() *simulatedClock {
-	return &simulatedClock{currentTime: time.Unix(0, 0).UTC()}
-}
-
-func (c simulatedClock) Now() time.Time {
-	return c.currentTime
-}
-
-type testPipeline struct {
+type testCase struct {
 	name      string
 	ipVersion string
-	pipeline  *collector.Pipeline
+	*pipelinetest.TestPipeline
 }
 
-func newTestPipeline(name, ipVersion string) *testPipeline {
-	return &testPipeline{name, ipVersion, collector.NewTestPipeline(newSimulatedClock())}
+func newTestCase(name, ipVersion string) *testCase {
+	var remoteAddr string
+	if ipVersion == "ipv6" {
+		remoteAddr = "[2001:db8::2]:1234"
+	}
+	return &testCase{name, ipVersion, pipelinetest.NewTestPipeline(remoteAddr)}
 }
 
-func (p *testPipeline) fullname() string {
+func (p *testCase) fullname() string {
 	return p.name + "." + p.ipVersion
 }
 
-func (p *testPipeline) testdataName(suffix string) string {
+func (p *testCase) testdataName(suffix string) string {
 	return p.name + suffix
 }
 
-func (p *testPipeline) ipdataName(suffix string) string {
+func (p *testCase) ipdataName(suffix string) string {
 	return p.name + "." + p.ipVersion + suffix
 }
 
-func (p *testPipeline) handleCustomRequest(t *testing.T, method, mimeType string) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, "https://example.com/upload/", bytes.NewReader(testdata(t, p.testdataName(".json"))))
-	request.Header.Add("Content-Type", mimeType)
-	if p.ipVersion == "ipv6" {
-		request.RemoteAddr = "[2001:db8::2]:1234"
-	}
-	var response httptest.ResponseRecorder
-	p.pipeline.ServeHTTP(&response, request)
-	return &response
-}
-
-func (p *testPipeline) handleRequest(t *testing.T) bool {
-	response := p.handleCustomRequest(t, "POST", "application/report")
-	if response.Code != http.StatusNoContent {
-		t.Errorf("ServeHTTP(%s): got %d, wanted %d", p.fullname(), response.Code, http.StatusNoContent)
-		return false
-	}
-	return true
-}
-
-func allPipelineTests() []testPipeline {
-	result := make([]testPipeline, len(testFiles)*2)
+func allPipelineTests() []testCase {
+	result := make([]testCase, len(testFiles)*2)
 	for i := range testFiles {
-		result[i*2] = *newTestPipeline(testFiles[i], "ipv4")
-		result[i*2+1] = *newTestPipeline(testFiles[i], "ipv6")
+		result[i*2] = *newTestCase(testFiles[i], "ipv4")
+		result[i*2+1] = *newTestCase(testFiles[i], "ipv6")
 	}
 	return result
 }
@@ -93,8 +64,8 @@ func allPipelineTests() []testPipeline {
 // Basic pipeline tests
 
 func TestIgnoreNonPOST(t *testing.T) {
-	pipeline := newTestPipeline("valid-nel-report", "")
-	response := pipeline.handleCustomRequest(t, "GET", "application/report")
+	pipeline := newTestCase("valid-nel-report", "")
+	response := pipeline.HandleCustomRequest(t, "GET", "application/report", testdata(t, pipeline.testdataName(".json")))
 	if response.Code != http.StatusMethodNotAllowed {
 		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusMethodNotAllowed)
 		return
@@ -102,8 +73,8 @@ func TestIgnoreNonPOST(t *testing.T) {
 }
 
 func TestIgnoreWrongContentType(t *testing.T) {
-	pipeline := newTestPipeline("valid-nel-report", "")
-	response := pipeline.handleCustomRequest(t, "POST", "application/json")
+	pipeline := newTestCase("valid-nel-report", "")
+	response := pipeline.HandleCustomRequest(t, "POST", "application/json", testdata(t, pipeline.testdataName(".json")))
 	if response.Code != http.StatusBadRequest {
 		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusBadRequest)
 		return
@@ -122,8 +93,10 @@ func TestProcessReports(t *testing.T) {
 	for _, p := range allPipelineTests() {
 		t.Run("Process:"+p.fullname(), func(t *testing.T) {
 			var batch collector.ReportBatch
-			p.pipeline.AddProcessor(&stashReports{&batch})
-			if !p.handleRequest(t) {
+			p.AddProcessor(&stashReports{&batch})
+			err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
+			if err != nil {
+				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
 				return
 			}
 
@@ -148,8 +121,10 @@ func TestDumpReports(t *testing.T) {
 	for _, p := range allPipelineTests() {
 		t.Run("Dump:"+p.fullname(), func(t *testing.T) {
 			var buffer bytes.Buffer
-			p.pipeline.AddProcessor(collector.ReportDumper{&buffer})
-			if !p.handleRequest(t) {
+			p.AddProcessor(collector.ReportDumper{&buffer})
+			err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
+			if err != nil {
+				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
 				return
 			}
 
@@ -188,9 +163,11 @@ func TestCustomAnnotation(t *testing.T) {
 	for _, p := range allPipelineTests() {
 		t.Run("Annotate:"+p.fullname(), func(t *testing.T) {
 			var batch collector.ReportBatch
-			p.pipeline.AddProcessor(&geoAnnotator{})
-			p.pipeline.AddProcessor(&stashReports{&batch})
-			if !p.handleRequest(t) {
+			p.AddProcessor(&geoAnnotator{})
+			p.AddProcessor(&stashReports{&batch})
+			err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
+			if err != nil {
+				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
 				return
 			}
 
