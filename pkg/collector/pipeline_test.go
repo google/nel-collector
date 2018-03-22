@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector
+package collector_test
 
 import (
 	"bytes"
@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/nel-collector/pkg/collector"
 )
 
 // Helpers
@@ -41,11 +42,11 @@ func (c simulatedClock) Now() time.Time {
 type testPipeline struct {
 	name      string
 	ipVersion string
-	pipeline  *Pipeline
+	pipeline  *collector.Pipeline
 }
 
 func newTestPipeline(name, ipVersion string) *testPipeline {
-	return &testPipeline{name, ipVersion, NewTestPipeline(newSimulatedClock())}
+	return &testPipeline{name, ipVersion, collector.NewTestPipeline(newSimulatedClock())}
 }
 
 func (p *testPipeline) fullname() string {
@@ -110,17 +111,17 @@ func TestIgnoreWrongContentType(t *testing.T) {
 }
 
 type stashReports struct {
-	dest *ReportBatch
+	dest *collector.ReportBatch
 }
 
-func (s stashReports) ProcessReports(batch *ReportBatch) {
+func (s stashReports) ProcessReports(batch *collector.ReportBatch) {
 	*s.dest = *batch
 }
 
 func TestProcessReports(t *testing.T) {
 	for _, p := range allPipelineTests() {
 		t.Run("Process:"+p.fullname(), func(t *testing.T) {
-			var batch ReportBatch
+			var batch collector.ReportBatch
 			p.pipeline.AddProcessor(&stashReports{&batch})
 			if !p.handleRequest(t) {
 				return
@@ -147,7 +148,7 @@ func TestDumpReports(t *testing.T) {
 	for _, p := range allPipelineTests() {
 		t.Run("Dump:"+p.fullname(), func(t *testing.T) {
 			var buffer bytes.Buffer
-			p.pipeline.AddProcessor(ReportDumper{&buffer})
+			p.pipeline.AddProcessor(collector.ReportDumper{&buffer})
 			if !p.handleRequest(t) {
 				return
 			}
@@ -176,7 +177,7 @@ var serverZones = map[string]string{
 
 type geoAnnotator struct{}
 
-func (g geoAnnotator) ProcessReports(batch *ReportBatch) {
+func (g geoAnnotator) ProcessReports(batch *collector.ReportBatch) {
 	batch.Annotation = clientCountries[batch.ClientIP]
 	for i := range batch.Reports {
 		batch.Reports[i].Annotation = serverZones[batch.Reports[i].ServerIP]
@@ -186,7 +187,7 @@ func (g geoAnnotator) ProcessReports(batch *ReportBatch) {
 func TestCustomAnnotation(t *testing.T) {
 	for _, p := range allPipelineTests() {
 		t.Run("Annotate:"+p.fullname(), func(t *testing.T) {
-			var batch ReportBatch
+			var batch collector.ReportBatch
 			p.pipeline.AddProcessor(&geoAnnotator{})
 			p.pipeline.AddProcessor(&stashReports{&batch})
 			if !p.handleRequest(t) {

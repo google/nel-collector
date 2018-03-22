@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector
+package collector_test
 
 import (
 	"bytes"
@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"testing"
+
+	"github.com/google/nel-collector/pkg/collector"
 )
 
 var update = flag.Bool("update", false, "update .golden files")
@@ -74,10 +76,10 @@ func compactJSON(b []byte) []byte {
 // spec-aware JSON parsing rules, instead dumping out the content exactly as it
 // looks in Go.  This is used extensively in test cases to compare the results
 // of parsing and annotating against golden files.
-func encodeRawReports(reports []NelReport) ([]byte, error) {
+func encodeRawReports(reports []collector.NelReport) ([]byte, error) {
 	// This type alias lets us override our spec-aware JSON parsing rules, and
 	// dump out the content of a NelReport instance exactly as it looks in Go.
-	type ParsedNelReport NelReport
+	type ParsedNelReport collector.NelReport
 	parsedReports := make([]ParsedNelReport, len(reports))
 	for i := range reports {
 		parsedReports[i] = (ParsedNelReport)(reports[i])
@@ -87,29 +89,29 @@ func encodeRawReports(reports []NelReport) ([]byte, error) {
 
 // decodeRawReports unmarshals an array of NelReports without using our custom
 // spec-aware JSON parsing rules.  It's the inverse of encodeRawReports.
-func decodeRawReports(b []byte, reports *[]NelReport) error {
+func decodeRawReports(b []byte, reports *[]collector.NelReport) error {
 	// This type alias lets us override our spec-aware JSON parsing rules, and
 	// dump out the content of a NelReport instance exactly as it looks in Go.
-	type ParsedNelReport NelReport
+	type ParsedNelReport collector.NelReport
 	var parsedReports []ParsedNelReport
 	err := json.Unmarshal(b, &parsedReports)
 	if err != nil {
 		return err
 	}
 
-	*reports = make([]NelReport, len(parsedReports))
+	*reports = make([]collector.NelReport, len(parsedReports))
 	for i := range parsedReports {
-		(*reports)[i] = (NelReport)(parsedReports[i])
+		(*reports)[i] = (collector.NelReport)(parsedReports[i])
 	}
 	return nil
 }
 
 // encodeRawBatch marshals a batch of NelReports, including any custom
 // annotations, without using our custom spec-aware JSON parsing rules.
-func encodeRawBatch(batch ReportBatch) ([]byte, error) {
+func encodeRawBatch(batch collector.ReportBatch) ([]byte, error) {
 	var err error
 	var rawBatch struct {
-		ReportBatch
+		collector.ReportBatch
 		RawReports json.RawMessage `json:"Reports"`
 	}
 
