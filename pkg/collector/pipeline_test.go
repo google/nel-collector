@@ -145,9 +145,9 @@ var serverZones = map[string]string{
 type geoAnnotator struct{}
 
 func (g geoAnnotator) ProcessReports(batch *collector.ReportBatch) {
-	batch.Annotation = clientCountries[batch.ClientIP]
+	batch.SetAnnotation("ClientCountry", clientCountries[batch.ClientIP])
 	for i := range batch.Reports {
-		batch.Reports[i].Annotation = serverZones[batch.Reports[i].ServerIP]
+		batch.Reports[i].SetAnnotation("ServerZone", serverZones[batch.Reports[i].ServerIP])
 	}
 }
 

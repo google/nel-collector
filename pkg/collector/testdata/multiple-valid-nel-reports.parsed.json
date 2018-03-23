@@ -11,7 +11,7 @@
     "ElapsedTime": 45,
     "Type": "ok",
     "RawBody": null,
-    "Annotation": null
+    "Annotations": null
   },
   {
     "Age": 500,
@@ -25,6 +25,6 @@
     "ElapsedTime": 45,
     "Type": "ok",
     "RawBody": null,
-    "Annotation": null
+    "Annotations": null
   }
 ]

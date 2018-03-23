@@ -13,7 +13,7 @@
   },
   "ClientIP": "192.0.2.1",
   "ClientUserAgent": "",
-  "Annotation": null,
+  "Annotations": null,
   "Reports": [
     {
       "Age": 500,
@@ -27,7 +27,7 @@
       "ElapsedTime": 45,
       "Type": "ok",
       "RawBody": null,
-      "Annotation": null
+      "Annotations": null
     }
   ]
 }

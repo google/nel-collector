@@ -48,7 +48,7 @@ type ReportBatch struct {
 
 	// An arbitrary set of extra data that you can attach to this batch of
 	// reports.
-	Annotation interface{}
+	Annotations
 }
 
 // A ReportProcessor implements one discrete processing step for handling
