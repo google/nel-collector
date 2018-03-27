@@ -57,8 +57,8 @@ func NewTestPipeline(remoteAddr string) *TestPipeline {
 // the given HTTP method and MIME type.  This is useful for test cases where you
 // want to verify that uploads that don't conform to the Reporting spec are
 // handled properly.
-func (p *TestPipeline) HandleCustomRequest(t *testing.T, method, mimeType string, payload []byte) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, "https://example.com/upload/", bytes.NewReader(payload))
+func (p *TestPipeline) HandleCustomRequest(t *testing.T, method, uploadURL, mimeType string, payload []byte) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(method, uploadURL, bytes.NewReader(payload))
 	request.Header.Add("Content-Type", mimeType)
 	if p.remoteAddr != "" {
 		request.RemoteAddr = p.remoteAddr
@@ -73,7 +73,7 @@ func (p *TestPipeline) HandleCustomRequest(t *testing.T, method, mimeType string
 // doesn't return a 204 ("success with no response content"), we return an
 // error.
 func (p *TestPipeline) HandleRequest(t *testing.T, payload []byte) error {
-	response := p.HandleCustomRequest(t, "POST", "application/report", payload)
+	response := p.HandleCustomRequest(t, "POST", "https://example.com/upload/", "application/report", payload)
 	if response.Code != http.StatusNoContent {
 		return fmt.Errorf("Incorrect status code: got %d, wanted %d", response.Code, http.StatusNoContent)
 	}

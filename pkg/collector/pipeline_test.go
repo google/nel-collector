@@ -65,7 +65,7 @@ func allPipelineTests() []testCase {
 
 func TestIgnoreNonPOST(t *testing.T) {
 	pipeline := newTestCase("valid-nel-report", "")
-	response := pipeline.HandleCustomRequest(t, "GET", "application/report", testdata(t, pipeline.testdataName(".json")))
+	response := pipeline.HandleCustomRequest(t, "GET", "https://example.com/upload/", "application/report", testdata(t, pipeline.testdataName(".json")))
 	if response.Code != http.StatusMethodNotAllowed {
 		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusMethodNotAllowed)
 		return
@@ -74,7 +74,7 @@ func TestIgnoreNonPOST(t *testing.T) {
 
 func TestIgnoreWrongContentType(t *testing.T) {
 	pipeline := newTestCase("valid-nel-report", "")
-	response := pipeline.HandleCustomRequest(t, "POST", "application/json", testdata(t, pipeline.testdataName(".json")))
+	response := pipeline.HandleCustomRequest(t, "POST", "https://example.com/upload/", "application/json", testdata(t, pipeline.testdataName(".json")))
 	if response.Code != http.StatusBadRequest {
 		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusBadRequest)
 		return
