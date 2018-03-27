@@ -59,7 +59,7 @@ type NelReport struct {
 	RawBody []byte
 
 	// An arbitrary set of extra data that you can attach to your reports.
-	Annotation interface{}
+	Annotations
 }
 
 type rawReport struct {

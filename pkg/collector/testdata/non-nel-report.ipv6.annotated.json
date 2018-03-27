@@ -13,7 +13,9 @@
   },
   "ClientIP": "2001:db8::2",
   "ClientUserAgent": "",
-  "Annotation": "",
+  "Annotations": {
+    "ClientCountry": ""
+  },
   "Reports": [
     {
       "Age": 500,
@@ -27,7 +29,9 @@
       "ElapsedTime": 0,
       "Type": "",
       "RawBody": "eyJyYW5kb20iOiAic3R1ZmYiLCAiaWdub3JlIjogMTAwfQ==",
-      "Annotation": ""
+      "Annotations": {
+        "ServerZone": ""
+      }
     }
   ]
 }
