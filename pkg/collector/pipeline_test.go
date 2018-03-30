@@ -16,7 +16,6 @@ package collector_test
 
 import (
 	"bytes"
-	"flag"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -25,8 +24,6 @@ import (
 	"github.com/google/nel-collector/pkg/collector"
 	"github.com/google/nel-collector/pkg/pipelinetest"
 )
-
-var update = flag.Bool("update", false, "update .golden files")
 
 // Basic pipeline tests
 

@@ -17,11 +17,14 @@ package collector_test
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 )
+
+var update = flag.Bool("update", false, "update .golden files")
 
 // testFiles is a list of all of the test cases that have an input data file in
 // the testdata/ subdirectory.  The list should be in the order that you want
