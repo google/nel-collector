@@ -73,7 +73,8 @@ func (c SimulatedClock) Now() time.Time {
 // which lines up with the `go test` convention of running test cases in the
 // directory of the package being tested.
 type PipelineTest struct {
-	// The name of the test case that will use this helper.
+	// The name of the test case that will use this helper.  Must be unique across
+	// all test cases that use the same OutputPath.
 	TestName string
 
 	// The pipeline being tested.  It should include a processor that adds a
@@ -154,6 +155,9 @@ func (p *PipelineTest) expectedOutput(payloadName, ipTag string, got []byte) []b
 	return content
 }
 
+// Run tests your pipeline against all of the input files that we found in your
+// InputPath, comparing the values of the TestResult annotation with the
+// corresponding golden files in OutputPath.
 func (p *PipelineTest) Run(t *testing.T) {
 	for _, payloadName := range p.payloadNames() {
 		for _, ip := range []struct{ tag, remoteAddr string }{{"ipv4", ""}, {"ipv6", "[2001:db8::2]:1234"}} {
