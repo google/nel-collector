@@ -193,7 +193,7 @@ func (p *PipelineTest) Run(t *testing.T) {
 
 				want := p.expectedOutput(payloadName, ip.tag, got)
 				if diff := diff.Diff((string)(want), (string)(got)); diff != "" {
-					t.Errorf("TestResult(%s:%s) got diff (want → got):\n%s")
+					t.Errorf("TestResult(%s:%s) got diff (want → got):\n%s", payloadName, ip.tag, diff)
 					return
 				}
 			})
