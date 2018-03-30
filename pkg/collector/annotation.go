@@ -69,8 +69,9 @@ type annotationWriter struct {
 
 // Write appends the contents of p to the current value of the annotation.
 func (w *annotationWriter) Write(p []byte) (int, error) {
-	// If there's already a value for the annotation, ensure that it's a []byte.
-	// If not, start with a nil slice.
+	// If there's already a value for the annotation, ensure that it's a []byte,
+	// raising an error if it's some other type.  If there is no value, start with
+	// a nil slice.
 	var b []byte
 	value := w.a.GetAnnotation(w.name)
 	if value != nil {
