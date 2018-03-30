@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector
+package core
+
+import "github.com/google/nel-collector/pkg/collector"
 
 // KeepNelReports is a pipeline processor that throws away any non-NEL reports.
 type KeepNelReports struct{}
 
 // ProcessReports throws away any non-NEL reports.
-func (KeepNelReports) ProcessReports(batch *ReportBatch) {
-	var filtered []NelReport
+func (KeepNelReports) ProcessReports(batch *collector.ReportBatch) {
+	var filtered []collector.NelReport
 	for _, report := range batch.Reports {
 		if report.ReportType == "network-error" {
 			filtered = append(filtered, report)
