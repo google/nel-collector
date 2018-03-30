@@ -57,38 +57,25 @@ func NewTestPipeline(remoteAddr string) *TestPipeline {
 // the given HTTP method and MIME type.  This is useful for test cases where you
 // want to verify that uploads that don't conform to the Reporting spec are
 // handled properly.
-func (p *TestPipeline) HandleCustomRequest(t *testing.T, method, uploadURL, mimeType string, payload []byte) *httptest.ResponseRecorder {
+func (p *TestPipeline) HandleCustomRequest(t *testing.T, method, uploadURL, mimeType string, payload []byte) (*collector.ReportBatch, *httptest.ResponseRecorder) {
 	request := httptest.NewRequest(method, uploadURL, bytes.NewReader(payload))
 	request.Header.Add("Content-Type", mimeType)
 	if p.remoteAddr != "" {
 		request.RemoteAddr = p.remoteAddr
 	}
 	var response httptest.ResponseRecorder
-	p.ServeHTTP(&response, request)
-	return &response
+	batch := p.ProcessReports(&response, request)
+	return batch, &response
 }
 
 // HandleRequest processes a report payload as if it were uploaded as required
 // by the Reporting spec.  We assume that the payload is valid; if the pipeline
 // doesn't return a 204 ("success with no response content"), we return an
 // error.
-func (p *TestPipeline) HandleRequest(t *testing.T, payload []byte) error {
-	response := p.HandleCustomRequest(t, "POST", "https://example.com/upload/", "application/report", payload)
+func (p *TestPipeline) HandleRequest(t *testing.T, payload []byte) (*collector.ReportBatch, error) {
+	batch, response := p.HandleCustomRequest(t, "POST", "https://example.com/upload/", "application/report", payload)
 	if response.Code != http.StatusNoContent {
-		return fmt.Errorf("Incorrect status code: got %d, wanted %d", response.Code, http.StatusNoContent)
+		return nil, fmt.Errorf("Incorrect status code: got %d, wanted %d", response.Code, http.StatusNoContent)
 	}
-	return nil
-}
-
-// StashReports is a pipeline processor that saves a copy of the report batch
-// into some other variable under your control.  You can use this to verify the
-// contents of the batch after the pipeline is done.
-type StashReports struct {
-	Dest *collector.ReportBatch
-}
-
-// ProcessReports saves a copy of the report batch into some other variable
-// under your control.
-func (s StashReports) ProcessReports(batch *collector.ReportBatch) {
-	*s.Dest = *batch
+	return batch, nil
 }

@@ -119,24 +119,25 @@ func (p *Pipeline) AddProcessor(processor ReportProcessor) {
 	p.processors = append(p.processors, processor)
 }
 
-// ServeHTTP listens for POSTed report uploads, as defined by the Reporting
-// spec, and runs all of the processors in the pipeline against each report.
-func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// ProcessReports extracts reports from a POST upload payload, as defined by the
+// Reporting spec, and runs all of the processors in the pipeline against each
+// report.
+func (p *Pipeline) ProcessReports(w http.ResponseWriter, r *http.Request) *ReportBatch {
 	if r.Method != "POST" {
 		http.Error(w, "Must use POST to upload reports", http.StatusMethodNotAllowed)
-		return
+		return nil
 	}
 
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/report" {
 		http.Error(w, "Must use application/report to upload reports", http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	clock := p.clock
@@ -153,7 +154,7 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err = decoder.Decode(&reports.Reports)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	for _, publisher := range p.processors {
@@ -161,4 +162,11 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// 204 isn't an error, per-se, but this does the right thing.
 	http.Error(w, "", http.StatusNoContent)
+	return &reports
+}
+
+// ServeHTTP handles POST report uploads, extracting the payload and handing it
+// off to ProcessReports for processing.
+func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	p.ProcessReports(w, r)
 }
