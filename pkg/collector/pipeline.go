@@ -16,40 +16,11 @@ package collector
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/url"
-	"strconv"
 	"time"
 )
-
-// ReportBatch is a collection of reports that should all be processed together.
-// We will create a new batch for each upload that the collector receives.
-// Certain processors might join batches together or split them up.
-type ReportBatch struct {
-	Reports []NelReport
-
-	// When this batch was received by the collector
-	Time time.Time
-
-	// The URL that was used to upload the report.
-	CollectorURL url.URL
-
-	// The IP address of the client that uploaded the batch of reports.  You can
-	// typically assume that's the same IP address that was used for the original
-	// requests.  The IP address will be encoded as a string; for example,
-	// "192.0.2.1" or "2001:db8::2".
-	ClientIP string
-
-	// The user agent of the client that uploaded the batch of reports.
-	ClientUserAgent string
-
-	// An arbitrary set of extra data that you can attach to this batch of
-	// reports.
-	Annotations
-}
 
 // A ReportProcessor implements one discrete processing step for handling
 // uploaded reports.  There are several predefined processors, which you can use
@@ -69,20 +40,7 @@ type ReportDumper struct {
 
 // ProcessReports prints out a summary of each report in the batch.
 func (d ReportDumper) ProcessReports(batch *ReportBatch) {
-	time := batch.Time.UTC().Format("02/Jan/2006:15:04:05.000 -0700")
-	for _, report := range batch.Reports {
-		if report.ReportType == "network-error" {
-			var result string
-			if report.Type == "ok" || report.Type == "http.error" {
-				result = strconv.Itoa(report.StatusCode)
-			} else {
-				result = report.Type
-			}
-			fmt.Fprintf(d.Writer, "%s - - [%s] \"GET %s\" %s -\n", batch.ClientIP, time, report.URL, result)
-		} else {
-			fmt.Fprintf(d.Writer, "%s - - [%s] \"GET %s\" <%s> -\n", batch.ClientIP, time, report.URL, report.ReportType)
-		}
-	}
+	PrintBatchAsCLF(batch, d.Writer)
 }
 
 // Clock lets you override how a pipeline assigns timestamps to each report.
@@ -119,24 +77,25 @@ func (p *Pipeline) AddProcessor(processor ReportProcessor) {
 	p.processors = append(p.processors, processor)
 }
 
-// ServeHTTP listens for POSTed report uploads, as defined by the Reporting
-// spec, and runs all of the processors in the pipeline against each report.
-func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// ProcessReports extracts reports from a POST upload payload, as defined by the
+// Reporting spec, and runs all of the processors in the pipeline against each
+// report.
+func (p *Pipeline) ProcessReports(w http.ResponseWriter, r *http.Request) *ReportBatch {
 	if r.Method != "POST" {
 		http.Error(w, "Must use POST to upload reports", http.StatusMethodNotAllowed)
-		return
+		return nil
 	}
 
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/report" {
 		http.Error(w, "Must use application/report to upload reports", http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	clock := p.clock
@@ -153,7 +112,7 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err = decoder.Decode(&reports.Reports)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	for _, publisher := range p.processors {
@@ -161,4 +120,11 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// 204 isn't an error, per-se, but this does the right thing.
 	http.Error(w, "", http.StatusNoContent)
+	return &reports
+}
+
+// ServeHTTP handles POST report uploads, extracting the payload and handing it
+// off to ProcessReports for processing.
+func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	p.ProcessReports(w, r)
 }

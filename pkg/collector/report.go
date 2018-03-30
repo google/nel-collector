@@ -16,6 +16,11 @@ package collector
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/url"
+	"strconv"
+	"time"
 )
 
 // A NelReport describes a single network error report.
@@ -145,6 +150,51 @@ func (r NelReport) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// ReportBatch is a collection of reports that should all be processed together.
+// We will create a new batch for each upload that the collector receives.
+// Certain processors might join batches together or split them up.
+type ReportBatch struct {
+	Reports []NelReport
+
+	// When this batch was received by the collector
+	Time time.Time
+
+	// The URL that was used to upload the report.
+	CollectorURL url.URL
+
+	// The IP address of the client that uploaded the batch of reports.  You can
+	// typically assume that's the same IP address that was used for the original
+	// requests.  The IP address will be encoded as a string; for example,
+	// "192.0.2.1" or "2001:db8::2".
+	ClientIP string
+
+	// The user agent of the client that uploaded the batch of reports.
+	ClientUserAgent string
+
+	// An arbitrary set of extra data that you can attach to this batch of
+	// reports.
+	Annotations
+}
+
+// PrintBatchAsCLF prints out a summary of each report in the batch using a
+// format not unlike the format of an Apache access.log file.
+func PrintBatchAsCLF(batch *ReportBatch, w io.Writer) {
+	time := batch.Time.UTC().Format("02/Jan/2006:15:04:05.000 -0700")
+	for _, report := range batch.Reports {
+		if report.ReportType == "network-error" {
+			var result string
+			if report.Type == "ok" || report.Type == "http.error" {
+				result = strconv.Itoa(report.StatusCode)
+			} else {
+				result = report.Type
+			}
+			fmt.Fprintf(w, "%s - - [%s] \"GET %s\" %s -\n", batch.ClientIP, time, report.URL, result)
+		} else {
+			fmt.Fprintf(w, "%s - - [%s] \"GET %s\" <%s> -\n", batch.ClientIP, time, report.URL, report.ReportType)
+		}
+	}
+}
+
 // EncodeRawReports marshals an array of NelReports without using our custom
 // spec-aware JSON parsing rules, instead dumping out the content exactly as it
 // looks in Go.  This is used extensively in test cases to compare the results
@@ -181,10 +231,10 @@ func DecodeRawReports(b []byte, reports *[]NelReport) error {
 
 // EncodeRawBatch marshals a batch of NelReports, including any custom
 // annotations, without using our custom spec-aware JSON parsing rules.
-func EncodeRawBatch(batch ReportBatch) ([]byte, error) {
+func EncodeRawBatch(batch *ReportBatch) ([]byte, error) {
 	var err error
 	var rawBatch struct {
-		ReportBatch
+		*ReportBatch
 		RawReports json.RawMessage `json:"Reports"`
 	}
 
