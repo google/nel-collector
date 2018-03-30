@@ -42,9 +42,9 @@ func TestNelReport(t *testing.T) {
 				return
 			}
 
-			got, err := encodeRawReports(reports)
+			got, err := collector.EncodeRawReports(reports)
 			if err != nil {
-				t.Errorf("encodeRawReports(%s): %v", name, err)
+				t.Errorf("EncodeRawReports(%s): %v", name, err)
 				return
 			}
 
@@ -63,9 +63,9 @@ func TestNelReport(t *testing.T) {
 			parsedData := testdata(t, parsedFile)
 
 			var reports []collector.NelReport
-			err := decodeRawReports(parsedData, &reports)
+			err := collector.DecodeRawReports(parsedData, &reports)
 			if err != nil {
-				t.Errorf("decodeRawReports(%s): %v", name, err)
+				t.Errorf("DecodeRawReports(%s): %v", name, err)
 				return
 			}
 

@@ -92,9 +92,9 @@ func TestProcessReports(t *testing.T) {
 				return
 			}
 
-			got, err := encodeRawBatch(batch)
+			got, err := collector.EncodeRawBatch(batch)
 			if err != nil {
-				t.Errorf("encodeRawBatch(%s): %v", p.fullname(), err)
+				t.Errorf("EncodeRawBatch(%s): %v", p.fullname(), err)
 				return
 			}
 
@@ -163,9 +163,9 @@ func TestCustomAnnotation(t *testing.T) {
 				return
 			}
 
-			got, err := encodeRawBatch(batch)
+			got, err := collector.EncodeRawBatch(batch)
 			if err != nil {
-				t.Errorf("encodeRawBatch(%s): %v", p.fullname(), err)
+				t.Errorf("EncodeRawBatch(%s): %v", p.fullname(), err)
 				return
 			}
 
