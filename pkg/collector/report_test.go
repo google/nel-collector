@@ -16,6 +16,7 @@ package collector_test
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -31,9 +32,9 @@ func TestNelReport(t *testing.T) {
 	// First test unmarshaling
 	for _, name := range testFiles {
 		t.Run("Unmarshal:"+name, func(t *testing.T) {
-			jsonFile := name + ".json"
-			parsedFile := name + ".parsed.json"
-			jsonData := testdata(t, jsonFile)
+			jsonFile := filepath.Join("../pipelinetest/testdata/reports", name+".json")
+			parsedFile := filepath.Join("testdata/TestNelReport", name+".json")
+			jsonData := testdata(jsonFile)
 
 			var reports []collector.NelReport
 			err := json.Unmarshal(jsonData, &reports)
@@ -48,7 +49,7 @@ func TestNelReport(t *testing.T) {
 				return
 			}
 
-			want := goldendata(t, parsedFile, got)
+			want := goldendata(parsedFile, got)
 			if !cmp.Equal(compactJSON(got), compactJSON(want)) {
 				t.Errorf("json.Unmarshal(%s) == %s, want %s", name, compactJSON(got), compactJSON(want))
 			}
@@ -58,9 +59,9 @@ func TestNelReport(t *testing.T) {
 	// Then test marshaling
 	for _, name := range testFiles {
 		t.Run("Marshal:"+name, func(t *testing.T) {
-			jsonFile := name + ".json"
-			parsedFile := name + ".parsed.json"
-			parsedData := testdata(t, parsedFile)
+			jsonFile := filepath.Join("../pipelinetest/testdata/reports", name+".json")
+			parsedFile := filepath.Join("testdata/TestNelReport", name+".json")
+			parsedData := testdata(parsedFile)
 
 			var reports []collector.NelReport
 			err := collector.DecodeRawReports(parsedData, &reports)
@@ -75,7 +76,7 @@ func TestNelReport(t *testing.T) {
 				return
 			}
 
-			want := testdata(t, jsonFile)
+			want := testdata(jsonFile)
 			if !cmp.Equal(compactJSON(got), compactJSON(want)) {
 				t.Errorf("json.Marshal(%s) == %s, want %s", name, compactJSON(got), compactJSON(want))
 			}

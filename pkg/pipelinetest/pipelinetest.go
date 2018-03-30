@@ -18,64 +18,194 @@ package pipelinetest
 
 import (
 	"bytes"
-	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/nel-collector/pkg/collector"
+	"github.com/kylelemons/godebug/diff"
 )
 
-type simulatedClock struct {
-	currentTime time.Time
+// SimulatedClock is a Clock that gives you full control over which times are
+// reported.  This can be used in test cases to give reproducible timestamps in
+// your expected output.
+type SimulatedClock struct {
+	CurrentTime time.Time
 }
 
-func newSimulatedClock() *simulatedClock {
-	return &simulatedClock{currentTime: time.Unix(0, 0).UTC()}
+// NewSimulatedClock returns a new SimulatedClock last initially reports the
+// Unix expoch (midnight January 1, 1970) as the current time.
+func NewSimulatedClock() *SimulatedClock {
+	return &SimulatedClock{CurrentTime: time.Unix(0, 0).UTC()}
 }
 
-func (c simulatedClock) Now() time.Time {
-	return c.currentTime
+// Now returns the current time according to this SimulatedClock.
+func (c SimulatedClock) Now() time.Time {
+	return c.CurrentTime
 }
 
-// TestPipeline is a wrapper around Pipeline that is easier to use in test
-// cases.  It uses a simulated clock, giving you reproducible timestamps in test
-// output, and has helper methods for "uploading" a report payload.
-type TestPipeline struct {
-	*collector.Pipeline
-	remoteAddr string
+// PipelineTest automates the process of running a NEL collector pipeline
+// against a large number of test uploads.
+//
+// We use testdata files to store several input report payloads, and golden
+// files to hold the expected output of your pipeline for each of those
+// payloads.  Running the test cases with the `--update` flag will overwrite the
+// golden files with the current output from your pipeline.
+//
+// We expect the following directory structure:
+//
+//   [InputPath]/
+//     testdata/
+//       reports/
+//         [payload-name].json
+//   [OutputPath]/
+//     testdata/
+//       [TestName]/
+//         [payload-name].ipv{4,6}.[OutputExtension]
+//
+// InputPath and OutputPath both default to the current directory if empty,
+// which lines up with the `go test` convention of running test cases in the
+// directory of the package being tested.
+type PipelineTest struct {
+	// The name of the test case that will use this helper.
+	TestName string
+
+	// The pipeline being tested.  It should include a processor that adds a
+	// []byte annotation named `TestResult` to the report batch; we'll verify the
+	// contents of this annotation to determine whether each test succeeded.
+	Pipeline *collector.Pipeline
+
+	// The path containing the testdata directory where we can find the files
+	// containing the input report payloads.  For tests of package pipelinetest
+	// itself, the default value ("") is correct.  If you want to test processors
+	// in other packages, and reuse the input files from pipelinetest, set this to
+	// the directory containing pipelinetest's testdata directory.
+	InputPath string
+
+	// The path containing the testdata directory where we can find the golden
+	// files containing the expected output for your test case.  For most
+	// packages, the default value ("") is correct.
+	OutputPath string
+
+	// The extension that we should use for the golden files for your test case.
+	// If empty, we will use ".json".
+	OutputExtension string
+
+	// Whether to update the content of the golden files with the current actual
+	// test output.  You'll usually set this to the value of an `--update`
+	// command-line flag.
+	UpdateGoldenFiles bool
 }
 
-// NewTestPipeline creates a Pipeline that will use a particular Clock to assign
-// times to each report batch, instead of using time.Now.
-func NewTestPipeline(remoteAddr string) *TestPipeline {
-	return &TestPipeline{collector.NewPipeline(newSimulatedClock()), remoteAddr}
-}
-
-// HandleCustomRequest processes a report payload as if it were uploaded using
-// the given HTTP method and MIME type.  This is useful for test cases where you
-// want to verify that uploads that don't conform to the Reporting spec are
-// handled properly.
-func (p *TestPipeline) HandleCustomRequest(t *testing.T, method, uploadURL, mimeType string, payload []byte) (*collector.ReportBatch, *httptest.ResponseRecorder) {
-	request := httptest.NewRequest(method, uploadURL, bytes.NewReader(payload))
-	request.Header.Add("Content-Type", mimeType)
-	if p.remoteAddr != "" {
-		request.RemoteAddr = p.remoteAddr
+// payloadNames returns all of the base filenames (not including the ".json"
+// extension) of any input files found in the testdata directory.
+func (p *PipelineTest) payloadNames() []string {
+	var result []string
+	basePath := filepath.Join(p.InputPath, "testdata", "reports")
+	err := filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() && path != basePath {
+			return filepath.SkipDir
+		}
+		base := filepath.Base(path)
+		if filepath.Ext(base) != ".json" {
+			return nil
+		}
+		result = append(result, strings.TrimSuffix(base, ".json"))
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
 	}
-	var response httptest.ResponseRecorder
-	batch := p.ProcessReports(&response, request)
-	return batch, &response
+	return result
 }
 
-// HandleRequest processes a report payload as if it were uploaded as required
-// by the Reporting spec.  We assume that the payload is valid; if the pipeline
-// doesn't return a 204 ("success with no response content"), we return an
-// error.
-func (p *TestPipeline) HandleRequest(t *testing.T, payload []byte) (*collector.ReportBatch, error) {
-	batch, response := p.HandleCustomRequest(t, "POST", "https://example.com/upload/", "application/report", payload)
-	if response.Code != http.StatusNoContent {
-		return nil, fmt.Errorf("Incorrect status code: got %d, wanted %d", response.Code, http.StatusNoContent)
+// inputPayload loads the contents of an input report payload.
+func (p *PipelineTest) inputPayload(payloadName string) []byte {
+	path := filepath.Join(p.InputPath, "testdata", "reports", payloadName+".json")
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
 	}
-	return batch, nil
+	return content
+}
+
+// expectedOutput loads the contents of a goldendata output file.  If the
+// `--update` flags is set, we first update the file's contents with `got` (and
+// will therefore always return `got`).
+func (p *PipelineTest) expectedOutput(payloadName, ipTag string, got []byte) []byte {
+	path := filepath.Join(p.OutputPath, "testdata", p.TestName, payloadName+"."+ipTag+p.OutputExtension)
+	if p.UpdateGoldenFiles && got != nil {
+		os.MkdirAll(filepath.Dir(path), 0755)
+		ioutil.WriteFile(path, got, 0644)
+	}
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return content
+}
+
+func (p *PipelineTest) Run(t *testing.T) {
+	for _, payloadName := range p.payloadNames() {
+		for _, ip := range []struct{ tag, remoteAddr string }{{"ipv4", ""}, {"ipv6", "[2001:db8::2]:1234"}} {
+			t.Run(p.TestName+":"+payloadName+":"+ip.tag, func(t *testing.T) {
+				payload := p.inputPayload(payloadName)
+				request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(payload))
+				request.Header.Add("Content-Type", "application/report")
+				if ip.remoteAddr != "" {
+					request.RemoteAddr = ip.remoteAddr
+				}
+
+				var response httptest.ResponseRecorder
+				batch := p.Pipeline.ProcessReports(&response, request)
+				if response.Code != http.StatusNoContent {
+					t.Errorf("ProcessReports(%s:%s) got status code %d, wanted %d", payloadName, ip.tag, response.Code, http.StatusNoContent)
+					return
+				}
+				if batch == nil {
+					t.Errorf("ProcessReports(%s:%s) got nil", payloadName, ip.tag)
+					return
+				}
+
+				result := batch.GetAnnotation("TestResult")
+				if result == nil {
+					t.Errorf("TestResult(%s:%s) got nil", payloadName, ip.tag)
+					return
+				}
+
+				got, ok := result.([]byte)
+				if !ok {
+					t.Errorf("TestResult(%s:%s) got %v, wanted []byte", payloadName, ip.tag, result)
+				}
+
+				want := p.expectedOutput(payloadName, ip.tag, got)
+				if diff := diff.Diff((string)(want), (string)(got)); diff != "" {
+					t.Errorf("TestResult(%s:%s) got diff (want → got):\n%s")
+					return
+				}
+			})
+		}
+	}
+}
+
+// EncodeBatchAsResult is a pipeline processor that saves a copy of the report
+// batch into the TestResult annotation.  You can use this with PipelineTest to
+// use the full contents of the batch (including annotations) as the output to
+// compare in your test case.
+type EncodeBatchAsResult struct{}
+
+// ProcessReports saves a copy of the report batch into the TestResult
+// annotation.
+func (e EncodeBatchAsResult) ProcessReports(batch *collector.ReportBatch) {
+	encoded, _ := collector.EncodeRawBatch(batch)
+	batch.SetAnnotation("TestResult", encoded)
 }
