@@ -48,3 +48,22 @@ func TestAnnotations(t *testing.T) {
 		t.Errorf("GetAnnotation(%#v) = %#v, wanted %#v", "test", value, "goodbye world")
 	}
 }
+
+func TestAnnotationWriter(t *testing.T) {
+	annotations := &collector.Annotations{}
+	writer := annotations.AnnotationWriter("test")
+
+	// An annotation should start off not being present.
+	value := annotations.GetAnnotation("test")
+	if value != nil {
+		t.Errorf("GetAnnotation(%#v) = %#v, wanted nil", "test", value)
+	}
+
+	// But we can write to it.
+	writer.Write([]byte("hello"))
+	writer.Write([]byte(" world"))
+	value = string(annotations.GetAnnotation("test").([]byte))
+	if value != "hello world" {
+		t.Errorf("GetAnnotation(%#v) = %#v, wanted %#v", "test", value, "hello world")
+	}
+}
