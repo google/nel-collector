@@ -108,10 +108,10 @@ func decodeRawReports(b []byte, reports *[]collector.NelReport) error {
 
 // encodeRawBatch marshals a batch of NelReports, including any custom
 // annotations, without using our custom spec-aware JSON parsing rules.
-func encodeRawBatch(batch collector.ReportBatch) ([]byte, error) {
+func encodeRawBatch(batch *collector.ReportBatch) ([]byte, error) {
 	var err error
 	var rawBatch struct {
-		collector.ReportBatch
+		*collector.ReportBatch
 		RawReports json.RawMessage `json:"Reports"`
 	}
 

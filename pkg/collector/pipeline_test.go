@@ -65,7 +65,7 @@ func allPipelineTests() []testCase {
 
 func TestIgnoreNonPOST(t *testing.T) {
 	pipeline := newTestCase("valid-nel-report", "")
-	response := pipeline.HandleCustomRequest(t, "GET", "https://example.com/upload/", "application/report", testdata(t, pipeline.testdataName(".json")))
+	_, response := pipeline.HandleCustomRequest(t, "GET", "https://example.com/upload/", "application/report", testdata(t, pipeline.testdataName(".json")))
 	if response.Code != http.StatusMethodNotAllowed {
 		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusMethodNotAllowed)
 		return
@@ -74,7 +74,7 @@ func TestIgnoreNonPOST(t *testing.T) {
 
 func TestIgnoreWrongContentType(t *testing.T) {
 	pipeline := newTestCase("valid-nel-report", "")
-	response := pipeline.HandleCustomRequest(t, "POST", "https://example.com/upload/", "application/json", testdata(t, pipeline.testdataName(".json")))
+	_, response := pipeline.HandleCustomRequest(t, "POST", "https://example.com/upload/", "application/json", testdata(t, pipeline.testdataName(".json")))
 	if response.Code != http.StatusBadRequest {
 		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusBadRequest)
 		return
@@ -84,9 +84,7 @@ func TestIgnoreWrongContentType(t *testing.T) {
 func TestProcessReports(t *testing.T) {
 	for _, p := range allPipelineTests() {
 		t.Run("Process:"+p.fullname(), func(t *testing.T) {
-			var batch collector.ReportBatch
-			p.AddProcessor(&pipelinetest.StashReports{&batch})
-			err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
+			batch, err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
 			if err != nil {
 				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
 				return
@@ -114,7 +112,7 @@ func TestDumpReports(t *testing.T) {
 		t.Run("Dump:"+p.fullname(), func(t *testing.T) {
 			var buffer bytes.Buffer
 			p.AddProcessor(collector.ReportDumper{&buffer})
-			err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
+			_, err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
 			if err != nil {
 				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
 				return
@@ -154,10 +152,8 @@ func (g geoAnnotator) ProcessReports(batch *collector.ReportBatch) {
 func TestCustomAnnotation(t *testing.T) {
 	for _, p := range allPipelineTests() {
 		t.Run("Annotate:"+p.fullname(), func(t *testing.T) {
-			var batch collector.ReportBatch
 			p.AddProcessor(&geoAnnotator{})
-			p.AddProcessor(&pipelinetest.StashReports{&batch})
-			err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
+			batch, err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
 			if err != nil {
 				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
 				return
