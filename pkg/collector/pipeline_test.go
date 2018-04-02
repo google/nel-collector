@@ -17,115 +17,67 @@ package collector_test
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/nel-collector/pkg/collector"
 	"github.com/google/nel-collector/pkg/pipelinetest"
 )
 
-// Helpers
-
-type testCase struct {
-	name      string
-	ipVersion string
-	*pipelinetest.TestPipeline
-}
-
-func newTestCase(name, ipVersion string) *testCase {
-	var remoteAddr string
-	if ipVersion == "ipv6" {
-		remoteAddr = "[2001:db8::2]:1234"
-	}
-	return &testCase{name, ipVersion, pipelinetest.NewTestPipeline(remoteAddr)}
-}
-
-func (p *testCase) fullname() string {
-	return p.name + "." + p.ipVersion
-}
-
-func (p *testCase) testdataName(suffix string) string {
-	return p.name + suffix
-}
-
-func (p *testCase) ipdataName(suffix string) string {
-	return p.name + "." + p.ipVersion + suffix
-}
-
-func allPipelineTests() []testCase {
-	result := make([]testCase, len(testFiles)*2)
-	for i := range testFiles {
-		result[i*2] = *newTestCase(testFiles[i], "ipv4")
-		result[i*2+1] = *newTestCase(testFiles[i], "ipv6")
-	}
-	return result
-}
-
 // Basic pipeline tests
 
+var validNelReportPath = filepath.Clean("../pipelinetest/testdata/reports/valid-nel-report.json")
+
 func TestIgnoreNonPOST(t *testing.T) {
-	pipeline := newTestCase("valid-nel-report", "")
-	_, response := pipeline.HandleCustomRequest(t, "GET", "https://example.com/upload/", "application/report", testdata(t, pipeline.testdataName(".json")))
-	if response.Code != http.StatusMethodNotAllowed {
-		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusMethodNotAllowed)
+	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(testdata(validNelReportPath)))
+	request.Header.Add("Content-Type", "application/report")
+	var response httptest.ResponseRecorder
+	pipeline.ServeHTTP(&response, request)
+	if want := http.StatusMethodNotAllowed; response.Code != want {
+		t.Errorf("ServeHTTP(method=GET): got %d, wanted %d", response.Code, want)
 		return
 	}
 }
 
 func TestIgnoreWrongContentType(t *testing.T) {
-	pipeline := newTestCase("valid-nel-report", "")
-	_, response := pipeline.HandleCustomRequest(t, "POST", "https://example.com/upload/", "application/json", testdata(t, pipeline.testdataName(".json")))
-	if response.Code != http.StatusBadRequest {
-		t.Errorf("ServeHTTP(%s): got %d, wanted %d", pipeline.fullname(), response.Code, http.StatusBadRequest)
+	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(testdata(validNelReportPath)))
+	request.Header.Add("Content-Type", "application/json")
+	var response httptest.ResponseRecorder
+	pipeline.ServeHTTP(&response, request)
+	if want := http.StatusBadRequest; response.Code != want {
+		t.Errorf("ServeHTTP(Content-Type=application/json): got %d, wanted %d", response.Code, want)
 		return
 	}
 }
 
 func TestProcessReports(t *testing.T) {
-	for _, p := range allPipelineTests() {
-		t.Run("Process:"+p.fullname(), func(t *testing.T) {
-			batch, err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
-			if err != nil {
-				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
-				return
-			}
-
-			got, err := collector.EncodeRawBatch(batch)
-			if err != nil {
-				t.Errorf("EncodeRawBatch(%s): %v", p.fullname(), err)
-				return
-			}
-
-			want := goldendata(t, p.ipdataName(".processed.json"), got)
-			if !cmp.Equal(got, want) {
-				t.Errorf("ReportDumper(%s) == %s, wanted %s", p.fullname(), got, want)
-				return
-			}
-		})
+	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
+	p := pipelinetest.PipelineTest{
+		TestName:          "TestProcessReports",
+		Pipeline:          pipeline,
+		InputPath:         "../pipelinetest",
+		UpdateGoldenFiles: *update,
 	}
+	p.Run(t)
 }
 
 // CLF log dumping test cases
 
 func TestDumpReports(t *testing.T) {
-	for _, p := range allPipelineTests() {
-		t.Run("Dump:"+p.fullname(), func(t *testing.T) {
-			var buffer bytes.Buffer
-			p.AddProcessor(collector.ReportDumper{&buffer})
-			_, err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
-			if err != nil {
-				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
-				return
-			}
-
-			got := buffer.Bytes()
-			want := goldendata(t, p.ipdataName(".dumped.log"), got)
-			if !cmp.Equal(got, want) {
-				t.Errorf("ReportDumper(%s) == %s, wanted %s", p.fullname(), got, want)
-				return
-			}
-		})
+	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	pipeline.AddProcessor(collector.ReportDumper{})
+	p := pipelinetest.PipelineTest{
+		TestName:          "TestDumpReports",
+		Pipeline:          pipeline,
+		InputPath:         "../pipelinetest",
+		OutputExtension:   ".log",
+		UpdateGoldenFiles: *update,
 	}
+	p.Run(t)
 }
 
 // Custom annotations
@@ -150,26 +102,14 @@ func (g geoAnnotator) ProcessReports(batch *collector.ReportBatch) {
 }
 
 func TestCustomAnnotation(t *testing.T) {
-	for _, p := range allPipelineTests() {
-		t.Run("Annotate:"+p.fullname(), func(t *testing.T) {
-			p.AddProcessor(&geoAnnotator{})
-			batch, err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
-			if err != nil {
-				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
-				return
-			}
-
-			got, err := collector.EncodeRawBatch(batch)
-			if err != nil {
-				t.Errorf("EncodeRawBatch(%s): %v", p.fullname(), err)
-				return
-			}
-
-			want := goldendata(t, p.ipdataName(".annotated.json"), got)
-			if !cmp.Equal(got, want) {
-				t.Errorf("ReportDumper(%s) == %s, wanted %s", p.fullname(), got, want)
-				return
-			}
-		})
+	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	pipeline.AddProcessor(&geoAnnotator{})
+	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
+	p := pipelinetest.PipelineTest{
+		TestName:          "TestCustomAnnotation",
+		Pipeline:          pipeline,
+		InputPath:         "../pipelinetest",
+		UpdateGoldenFiles: *update,
 	}
+	p.Run(t)
 }

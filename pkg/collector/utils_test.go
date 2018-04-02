@@ -19,8 +19,9 @@ import (
 	"encoding/json"
 	"flag"
 	"io/ioutil"
+	"log"
+	"os"
 	"path/filepath"
-	"testing"
 )
 
 var update = flag.Bool("update", false, "update .golden files")
@@ -34,27 +35,29 @@ var testFiles = []string{
 	"non-nel-report",
 }
 
-// testdata loads the contents of a file in the testdata/ subdirectory.
-func testdata(t *testing.T, relPath string) []byte {
-	fullPath := filepath.Join("testdata", relPath)
-	content, err := ioutil.ReadFile(fullPath)
+// testdata loads the contents of a file in the testdata/ subdirectory.  (path
+// must be relative to the current working directory, just as ioutil.ReadFile
+// expects.)
+func testdata(path string) []byte {
+	content, err := ioutil.ReadFile(path)
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 	}
 	return content
 }
 
 // goldendata loads the contents of a file in the testdata/ subdirectory,
 // updating the contents of the file first (with `got`) if the --update flag is
-// given.
-func goldendata(t *testing.T, relPath string, got []byte) []byte {
-	fullPath := filepath.Join("testdata", relPath)
+// given.  (path must be relative to the current working directory, just as
+// ioutil.ReadFile expects.)
+func goldendata(path string, got []byte) []byte {
 	if *update {
-		ioutil.WriteFile(fullPath, got, 0644)
+		os.MkdirAll(filepath.Dir(path), 0755)
+		ioutil.WriteFile(path, got, 0644)
 	}
-	content, err := ioutil.ReadFile(fullPath)
+	content, err := ioutil.ReadFile(path)
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 	}
 	return content
 }

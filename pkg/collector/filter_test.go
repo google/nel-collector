@@ -17,31 +17,19 @@ package collector_test
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/nel-collector/pkg/collector"
+	"github.com/google/nel-collector/pkg/pipelinetest"
 )
 
 func TestKeepNelReports(t *testing.T) {
-	for _, p := range allPipelineTests() {
-		t.Run("KeepNelReports:"+p.fullname(), func(t *testing.T) {
-			p.AddProcessor(&collector.KeepNelReports{})
-			batch, err := p.HandleRequest(t, testdata(t, p.testdataName(".json")))
-			if err != nil {
-				t.Errorf("HandleRequest(%s): %v", p.fullname(), err)
-				return
-			}
-
-			got, err := collector.EncodeRawBatch(batch)
-			if err != nil {
-				t.Errorf("EncodeRawBatch(%s): %v", p.fullname(), err)
-				return
-			}
-
-			want := goldendata(t, p.ipdataName(".keep-nel.json"), got)
-			if !cmp.Equal(got, want) {
-				t.Errorf("ReportDumper(%s) == %s, wanted %s", p.fullname(), got, want)
-				return
-			}
-		})
+	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	pipeline.AddProcessor(collector.KeepNelReports{})
+	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
+	p := pipelinetest.PipelineTest{
+		TestName:          "TestKeepNelReports",
+		Pipeline:          pipeline,
+		InputPath:         "../pipelinetest",
+		UpdateGoldenFiles: *update,
 	}
+	p.Run(t)
 }
