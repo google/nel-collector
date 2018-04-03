@@ -12,24 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_test
+package core_test
 
-import (
-	"testing"
+import "flag"
 
-	"github.com/google/nel-collector/pkg/collector"
-	"github.com/google/nel-collector/pkg/pipelinetest"
-)
-
-func TestKeepNelReports(t *testing.T) {
-	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
-	pipeline.AddProcessor(collector.KeepNelReports{})
-	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
-	p := pipelinetest.PipelineTest{
-		TestName:          "TestKeepNelReports",
-		Pipeline:          pipeline,
-		InputPath:         "../pipelinetest",
-		UpdateGoldenFiles: *update,
-	}
-	p.Run(t)
-}
+var update = flag.Bool("update", false, "update .golden files")

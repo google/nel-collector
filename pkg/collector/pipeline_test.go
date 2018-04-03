@@ -65,21 +65,6 @@ func TestProcessReports(t *testing.T) {
 	p.Run(t)
 }
 
-// CLF log dumping test cases
-
-func TestDumpReports(t *testing.T) {
-	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
-	pipeline.AddProcessor(collector.ReportDumper{})
-	p := pipelinetest.PipelineTest{
-		TestName:          "TestDumpReports",
-		Pipeline:          pipeline,
-		InputPath:         "../pipelinetest",
-		OutputExtension:   ".log",
-		UpdateGoldenFiles: *update,
-	}
-	p.Run(t)
-}
-
 // Custom annotations
 
 var clientCountries = map[string]string{

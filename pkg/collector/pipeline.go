@@ -16,7 +16,6 @@ package collector
 
 import (
 	"encoding/json"
-	"io"
 	"net"
 	"net/http"
 	"time"
@@ -31,22 +30,6 @@ type ReportProcessor interface {
 	// over the contents of the batch; for instance, you can remove elements or
 	// update their contents, if appropriate.
 	ProcessReports(batch *ReportBatch)
-}
-
-// A ReportDumper is a ReportProcessor that prints out a summary of each report.
-// If Writer is nil, we'll save the summary as the value of the TestResult
-// annotation.
-type ReportDumper struct {
-	Writer io.Writer
-}
-
-// ProcessReports prints out a summary of each report in the batch.
-func (d ReportDumper) ProcessReports(batch *ReportBatch) {
-	writer := d.Writer
-	if writer == nil {
-		writer = batch.AnnotationWriter("TestResult")
-	}
-	PrintBatchAsCLF(batch, writer)
 }
 
 // Clock lets you override how a pipeline assigns timestamps to each report.
