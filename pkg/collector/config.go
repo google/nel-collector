@@ -105,8 +105,8 @@ func RegisterReportLoader(name string, loader ReportLoader) {
 	reportLoaders[name] = loader
 }
 
-// RegisterReportLoader registers a function that can load a particular kind of
-// report processor.
+// RegisterReportLoaderFunc registers a function that can load a particular kind
+// of report processor.
 func RegisterReportLoaderFunc(name string, loader func(config toml.Primitive) (ReportProcessor, error)) {
 	RegisterReportLoader(name, ReportLoaderFunc(loader))
 }
