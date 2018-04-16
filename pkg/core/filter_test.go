@@ -17,6 +17,7 @@ package core_test
 import (
 	"testing"
 
+	_ "github.com/google/nel-collector/pkg/core"
 	"github.com/google/nel-collector/pkg/pipelinetest"
 )
 
