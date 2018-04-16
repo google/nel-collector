@@ -41,13 +41,13 @@ var badConfigCases = []struct {
 	{"UnknownProcessorType", `processor = [{type = "UnknownType"}]`,
 		"Unknown processor type UnknownType for processor 0"},
 	{"ErrorLoadingProcessor", `processor = [{type = "AlwaysThrowsError"}]`,
-		"Couldn't create a AlwaysThrowsError for processor 0: This will never work!"},
+		"Couldn't create a AlwaysThrowsError for processor 0: this will never work"},
 }
 
 func TestBadConfig(t *testing.T) {
 	// Register a known processor type that always throws an error
 	collector.RegisterReportLoaderFunc("AlwaysThrowsError", func(config toml.Primitive) (collector.ReportProcessor, error) {
-		return nil, fmt.Errorf("This will never work!")
+		return nil, fmt.Errorf("this will never work")
 	})
 	for _, c := range badConfigCases {
 		t.Run("BadConfig:"+c.name, func(t *testing.T) {
