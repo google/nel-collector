@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/google/nel-collector/pkg/collector"
 	"github.com/kylelemons/godebug/diff"
 )
@@ -48,6 +49,20 @@ func NewSimulatedClock() *SimulatedClock {
 // Now returns the current time according to this SimulatedClock.
 func (c SimulatedClock) Now() time.Time {
 	return c.CurrentTime
+}
+
+// NewTestConfigPipeline constructs a new Pipeline from the contents of a TOML
+// configuration string.  We assume that configString is well-formed and panic
+// if there are any errors parsing it, or configuring the pipeline's processors.
+// This is especially useful in test cases, along with PipelineTest.
+func NewTestConfigPipeline(configString string) *collector.Pipeline {
+	p := collector.NewPipeline(NewSimulatedClock())
+	err := p.LoadFromConfig([]byte(configString))
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+	return p
 }
 
 // PipelineTest automates the process of running a NEL collector pipeline
@@ -212,4 +227,12 @@ type EncodeBatchAsResult struct{}
 func (e EncodeBatchAsResult) ProcessReports(batch *collector.ReportBatch) {
 	encoded, _ := collector.EncodeRawBatch(batch)
 	batch.SetAnnotation("TestResult", encoded)
+}
+
+func init() {
+	collector.RegisterReportLoaderFunc(
+		"EncodeBatchAsResult",
+		func(configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
+			return EncodeBatchAsResult{}, nil
+		})
 }

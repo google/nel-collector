@@ -15,8 +15,11 @@
 package core
 
 import (
+	"fmt"
 	"io"
+	"os"
 
+	"github.com/BurntSushi/toml"
 	"github.com/google/nel-collector/pkg/collector"
 )
 
@@ -35,4 +38,30 @@ func (d DumpReportsAsCLF) ProcessReports(batch *collector.ReportBatch) {
 		writer = batch.AnnotationWriter("TestResult")
 	}
 	collector.PrintBatchAsCLF(batch, writer)
+}
+
+func init() {
+	collector.RegisterReportLoaderFunc(
+		"DumpReportsAsCLF",
+		func(configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
+			var config struct {
+				Dest string `toml:"dest"`
+			}
+
+			err := toml.PrimitiveDecode(configPrimitive, &config)
+			if err != nil {
+				return nil, err
+			}
+			if config.Dest == "" {
+				return nil, fmt.Errorf("DumpReportsAsCLF missing `dest`")
+			}
+
+			if config.Dest == "stdout" {
+				return DumpReportsAsCLF{os.Stdout}, nil
+			} else if config.Dest == "annotation" {
+				return DumpReportsAsCLF{}, nil
+			} else {
+				return nil, fmt.Errorf("DumpReportsAsCLF invalid `dest`: %s", config.Dest)
+			}
+		})
 }

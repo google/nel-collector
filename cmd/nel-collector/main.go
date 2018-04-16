@@ -17,16 +17,21 @@
 package main
 
 import (
-	"flag"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/google/nel-collector/pkg/collector"
-	"github.com/google/nel-collector/pkg/core"
+	_ "github.com/google/nel-collector/pkg/core"
 )
 
-var keepNonNelReports = flag.Bool("keep-non-nel-reports", false, "keep non-NEL reports")
+var defaultConfig = []byte(`
+[[processor]]
+type = "KeepNelReports"
+
+[[processor]]
+type = "DumpReportsAsCLF"
+dest = "stdout"
+`)
 
 var rootBody = []byte(`
 <html>
@@ -50,10 +55,10 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	pipeline := &collector.Pipeline{}
-	if !*keepNonNelReports {
-		pipeline.AddProcessor(core.KeepNelReports{})
+	err := pipeline.LoadFromConfig(defaultConfig)
+	if err != nil {
+		log.Fatal(err)
 	}
-	pipeline.AddProcessor(core.DumpReportsAsCLF{os.Stdout})
 	http.HandleFunc("/", handleRoot)
 	http.Handle("/upload/", pipeline)
 	log.Fatal(http.ListenAndServe(":8080", nil))

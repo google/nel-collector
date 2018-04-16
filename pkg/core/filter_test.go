@@ -17,18 +17,18 @@ package core_test
 import (
 	"testing"
 
-	"github.com/google/nel-collector/pkg/collector"
-	"github.com/google/nel-collector/pkg/core"
 	"github.com/google/nel-collector/pkg/pipelinetest"
 )
 
 func TestKeepNelReports(t *testing.T) {
-	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
-	pipeline.AddProcessor(core.KeepNelReports{})
-	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
 	p := pipelinetest.PipelineTest{
-		TestName:          "TestKeepNelReports",
-		Pipeline:          pipeline,
+		TestName: "TestKeepNelReports",
+		Pipeline: pipelinetest.NewTestConfigPipeline(`
+			[[processor]]
+			type = "KeepNelReports"
+			[[processor]]
+			type = "EncodeBatchAsResult"
+		`),
 		InputPath:         "../pipelinetest",
 		UpdateGoldenFiles: *update,
 	}
