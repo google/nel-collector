@@ -143,7 +143,11 @@ func (p *PipelineTest) inputPayload(payloadName string) []byte {
 // `--update` flags is set, we first update the file's contents with `got` (and
 // will therefore always return `got`).
 func (p *PipelineTest) expectedOutput(payloadName, ipTag string, got []byte) []byte {
-	path := filepath.Join(p.OutputPath, "testdata", p.TestName, payloadName+"."+ipTag+p.OutputExtension)
+	outputExtension := p.OutputExtension
+	if outputExtension == "" {
+		outputExtension = ".json"
+	}
+	path := filepath.Join(p.OutputPath, "testdata", p.TestName, payloadName+"."+ipTag+outputExtension)
 	if p.UpdateGoldenFiles && got != nil {
 		os.MkdirAll(filepath.Dir(path), 0755)
 		ioutil.WriteFile(path, got, 0644)
