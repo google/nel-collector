@@ -14,7 +14,10 @@
 
 package core
 
-import "github.com/google/nel-collector/pkg/collector"
+import (
+	"github.com/BurntSushi/toml"
+	"github.com/google/nel-collector/pkg/collector"
+)
 
 // KeepNelReports is a pipeline processor that throws away any non-NEL reports.
 type KeepNelReports struct{}
@@ -28,4 +31,12 @@ func (KeepNelReports) ProcessReports(batch *collector.ReportBatch) {
 		}
 	}
 	batch.Reports = filtered
+}
+
+func init() {
+	collector.RegisterReportLoaderFunc(
+		"KeepNelReports",
+		func(configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
+			return KeepNelReports{}, nil
+		})
 }

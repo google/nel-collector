@@ -17,19 +17,20 @@ package core_test
 import (
 	"testing"
 
-	"github.com/google/nel-collector/pkg/collector"
-	"github.com/google/nel-collector/pkg/core"
+	_ "github.com/google/nel-collector/pkg/core"
 	"github.com/google/nel-collector/pkg/pipelinetest"
 )
 
 // CLF log dumping test cases
 
 func TestDumpReportsAsCLF(t *testing.T) {
-	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
-	pipeline.AddProcessor(core.DumpReportsAsCLF{})
 	p := pipelinetest.PipelineTest{
-		TestName:          "TestDumpReportsAsCLF",
-		Pipeline:          pipeline,
+		TestName: "TestDumpReportsAsCLF",
+		Pipeline: pipelinetest.NewTestConfigPipeline(`
+			[[processor]]
+			type = "DumpReportsAsCLF"
+			dest = "annotation"
+		`),
 		InputPath:         "../pipelinetest",
 		OutputExtension:   ".log",
 		UpdateGoldenFiles: *update,
