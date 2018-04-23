@@ -60,6 +60,8 @@ func (p *Pipeline) LoadFromConfig(configBytes []byte) error {
 		}
 		err := toml.PrimitiveDecode(processorPrimitive, &processorConfig)
 		if err != nil {
+			// The only way that PrimitiveDecode can fail is if the primitive isn't an
+			// object.  (If it's missing a `type` field that will just be set to nil.)
 			return fmt.Errorf("Processor config 0 must be an object")
 		}
 		if processorConfig.Type == "" {
