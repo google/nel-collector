@@ -120,6 +120,17 @@ func (c TestCase) BaseOutputFilename() string {
 	return c.PayloadName + "." + c.IPTag + c.OutputExtension
 }
 
+// Name returns the name of the test case, relative to the test name.
+func (c TestCase) Name() string {
+	return c.PayloadName + ":" + c.IPTag
+}
+
+// FullName returns the full name of the test case, including the overall test
+// name.
+func (c TestCase) FullName() string {
+	return c.TestName + "/" + c.Name()
+}
+
 // Run tests your pipeline against all of the input files that we found in your
 // InputPath, comparing the values of the TestResult annotation with the
 // corresponding golden files in OutputPath.
@@ -136,8 +147,8 @@ func (p *PipelineTest) Run(t *testing.T) {
 
 	for _, payloadName := range payloadNames {
 		for _, ip := range []struct{ tag, remoteAddr string }{{"ipv4", ""}, {"ipv6", "[2001:db8::2]:1234"}} {
-			t.Run(p.TestName+":"+payloadName+":"+ip.tag, func(t *testing.T) {
-				testCase := TestCase{p.TestName, payloadName, ip.tag, outputExtension}
+			testCase := TestCase{p.TestName, payloadName, ip.tag, outputExtension}
+			t.Run(testCase.Name(), func(t *testing.T) {
 				payload, err := p.Testdata.LoadInputFile(testCase)
 				if err != nil {
 					t.Fatal(err)
