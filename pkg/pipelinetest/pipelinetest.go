@@ -108,6 +108,18 @@ type TestCase struct {
 	OutputExtension string
 }
 
+// BaseInputFilename returns the base filename of the input file for a test
+// case.
+func (c TestCase) BaseInputFilename() string {
+	return c.PayloadName + ".json"
+}
+
+// BaseOutputFilename returns the base filename of the output file for a test
+// case.
+func (c TestCase) BaseOutputFilename() string {
+	return c.PayloadName + "." + c.IPTag + c.OutputExtension
+}
+
 // Run tests your pipeline against all of the input files that we found in your
 // InputPath, comparing the values of the TestResult annotation with the
 // corresponding golden files in OutputPath.
@@ -262,14 +274,14 @@ func (l DefaultTestdataLoader) GetPayloadNames() ([]string, error) {
 
 // LoadInputFile loads the contents of an input file from InputPath.
 func (l DefaultTestdataLoader) LoadInputFile(testCase TestCase) ([]byte, error) {
-	path := filepath.Join(l.InputPath, "testdata", "reports", testCase.PayloadName+".json")
+	path := filepath.Join(l.InputPath, "testdata", "reports", testCase.BaseInputFilename())
 	return ioutil.ReadFile(path)
 }
 
 // LoadOutputFile loads the contents of a golden file from OutputPath, updating
 // its contents with `got` if UpdateGoldenFiles is true.
 func (l DefaultTestdataLoader) LoadOutputFile(testCase TestCase, got []byte) ([]byte, error) {
-	path := filepath.Join(l.OutputPath, "testdata", testCase.TestName, testCase.PayloadName+"."+testCase.IPTag+testCase.OutputExtension)
+	path := filepath.Join(l.OutputPath, "testdata", testCase.TestName, testCase.BaseOutputFilename())
 	if l.UpdateGoldenFiles && got != nil {
 		err := os.MkdirAll(filepath.Dir(path), 0755)
 		if err != nil {
