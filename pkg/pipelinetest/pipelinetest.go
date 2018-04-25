@@ -227,11 +227,13 @@ type DefaultTestdataLoader struct {
 	UpdateGoldenFiles bool
 }
 
-// GetPayloadNames returns the PayloadNames of any input files found in
-// InputPath.
-func (l DefaultTestdataLoader) GetPayloadNames() ([]string, error) {
+// GetPayloadNames returns the PayloadNames of any input files found in a
+// particular directory.  (This makes it easy to write TestdataLoader instances
+// that load input files from the local filesystem; all you have to do in your
+// GetPayloadNames method is identify the correct path, and then delegate to
+// this helper function.)
+func GetPayloadNames(basePath string) ([]string, error) {
 	var result []string
-	basePath := filepath.Join(l.InputPath, "testdata", "reports")
 	err := filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -250,6 +252,12 @@ func (l DefaultTestdataLoader) GetPayloadNames() ([]string, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+// GetPayloadNames returns the PayloadNames of any input files found in
+// InputPath.
+func (l DefaultTestdataLoader) GetPayloadNames() ([]string, error) {
+	return GetPayloadNames(filepath.Join(l.InputPath, "testdata", "reports"))
 }
 
 // LoadInputFile loads the contents of an input file from InputPath.
