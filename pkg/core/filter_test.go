@@ -30,8 +30,10 @@ func TestKeepNelReports(t *testing.T) {
 			[[processor]]
 			type = "EncodeBatchAsResult"
 		`),
-		InputPath:         "../pipelinetest",
-		UpdateGoldenFiles: *update,
+		Testdata: pipelinetest.DefaultTestdataLoader{
+			InputPath:         "../pipelinetest",
+			UpdateGoldenFiles: *update,
+		},
 	}
 	p.Run(t)
 }

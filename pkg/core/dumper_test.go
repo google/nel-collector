@@ -31,9 +31,11 @@ func TestDumpReportsAsCLF(t *testing.T) {
 			type = "DumpReportsAsCLF"
 			dest = "annotation"
 		`),
-		InputPath:         "../pipelinetest",
-		OutputExtension:   ".log",
-		UpdateGoldenFiles: *update,
+		OutputExtension: ".log",
+		Testdata: pipelinetest.DefaultTestdataLoader{
+			InputPath:         "../pipelinetest",
+			UpdateGoldenFiles: *update,
+		},
 	}
 	p.Run(t)
 }
