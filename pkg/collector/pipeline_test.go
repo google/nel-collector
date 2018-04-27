@@ -57,10 +57,12 @@ func TestProcessReports(t *testing.T) {
 	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
 	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
 	p := pipelinetest.PipelineTest{
-		TestName:          "TestProcessReports",
-		Pipeline:          pipeline,
-		InputPath:         "../pipelinetest",
-		UpdateGoldenFiles: *update,
+		TestName: "TestProcessReports",
+		Pipeline: pipeline,
+		Testdata: pipelinetest.DefaultTestdataLoader{
+			InputPath:         "../pipelinetest",
+			UpdateGoldenFiles: *update,
+		},
 	}
 	p.Run(t)
 }
@@ -91,10 +93,12 @@ func TestCustomAnnotation(t *testing.T) {
 	pipeline.AddProcessor(&geoAnnotator{})
 	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
 	p := pipelinetest.PipelineTest{
-		TestName:          "TestCustomAnnotation",
-		Pipeline:          pipeline,
-		InputPath:         "../pipelinetest",
-		UpdateGoldenFiles: *update,
+		TestName: "TestCustomAnnotation",
+		Pipeline: pipeline,
+		Testdata: pipelinetest.DefaultTestdataLoader{
+			InputPath:         "../pipelinetest",
+			UpdateGoldenFiles: *update,
+		},
 	}
 	p.Run(t)
 }

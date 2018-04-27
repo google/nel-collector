@@ -72,21 +72,6 @@ func NewTestConfigPipeline(configString string) *collector.Pipeline {
 // files to hold the expected output of your pipeline for each of those
 // payloads.  Running the test cases with the `--update` flag will overwrite the
 // golden files with the current output from your pipeline.
-//
-// We expect the following directory structure:
-//
-//   [InputPath]/
-//     testdata/
-//       reports/
-//         [payload-name].json
-//   [OutputPath]/
-//     testdata/
-//       [TestName]/
-//         [payload-name].ipv{4,6}.[OutputExtension]
-//
-// InputPath and OutputPath both default to the current directory if empty,
-// which lines up with the `go test` convention of running test cases in the
-// directory of the package being tested.
 type PipelineTest struct {
 	// The name of the test case that will use this helper.  Must be unique across
 	// all test cases that use the same OutputPath.
@@ -97,91 +82,79 @@ type PipelineTest struct {
 	// contents of this annotation to determine whether each test succeeded.
 	Pipeline *collector.Pipeline
 
-	// The path containing the testdata directory where we can find the files
-	// containing the input report payloads.  For tests of package pipelinetest
-	// itself, the default value ("") is correct.  If you want to test processors
-	// in other packages, and reuse the input files from pipelinetest, set this to
-	// the directory containing pipelinetest's testdata directory.
-	InputPath string
-
-	// The path containing the testdata directory where we can find the golden
-	// files containing the expected output for your test case.  For most
-	// packages, the default value ("") is correct.
-	OutputPath string
-
 	// The extension that we should use for the golden files for your test case.
 	// If empty, we will use ".json".
 	OutputExtension string
 
-	// Whether to update the content of the golden files with the current actual
-	// test output.  You'll usually set this to the value of an `--update`
-	// command-line flag.
-	UpdateGoldenFiles bool
+	// The loader that will be used to read input and output files for each test
+	// case.
+	Testdata TestdataLoader
 }
 
-// payloadNames returns all of the base filenames (not including the ".json"
-// extension) of any input files found in the testdata directory.
-func (p *PipelineTest) payloadNames() []string {
-	var result []string
-	basePath := filepath.Join(p.InputPath, "testdata", "reports")
-	err := filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() && path != basePath {
-			return filepath.SkipDir
-		}
-		base := filepath.Base(path)
-		if filepath.Ext(base) != ".json" {
-			return nil
-		}
-		result = append(result, strings.TrimSuffix(base, ".json"))
-		return nil
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return result
+// TestCase describes one test case managed by a PipelineTest.
+type TestCase struct {
+	// The name of the PipelineTest that created this test case.
+	TestName string
+
+	// The name of the payload file that is used as input.  This will be the base
+	// filename of one of the files in the PipelineTest's InputPath, with the
+	// .json extension removed.
+	PayloadName string
+
+	// Whether the payload is fake-uploaded via `ipv4` or `ipv6`.
+	IPTag string
+
+	// The golden file extension for this test case.  Will never be empty.
+	OutputExtension string
 }
 
-// inputPayload loads the contents of an input report payload.
-func (p *PipelineTest) inputPayload(payloadName string) []byte {
-	path := filepath.Join(p.InputPath, "testdata", "reports", payloadName+".json")
-	content, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return content
+// BaseInputFilename returns the base filename of the input file for a test
+// case.
+func (c TestCase) BaseInputFilename() string {
+	return c.PayloadName + ".json"
 }
 
-// expectedOutput loads the contents of a goldendata output file.  If the
-// `--update` flags is set, we first update the file's contents with `got` (and
-// will therefore always return `got`).
-func (p *PipelineTest) expectedOutput(payloadName, ipTag string, got []byte) []byte {
-	outputExtension := p.OutputExtension
-	if outputExtension == "" {
-		outputExtension = ".json"
-	}
-	path := filepath.Join(p.OutputPath, "testdata", p.TestName, payloadName+"."+ipTag+outputExtension)
-	if p.UpdateGoldenFiles && got != nil {
-		os.MkdirAll(filepath.Dir(path), 0755)
-		ioutil.WriteFile(path, got, 0644)
-	}
-	content, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return content
+// BaseOutputFilename returns the base filename of the output file for a test
+// case.
+func (c TestCase) BaseOutputFilename() string {
+	return c.PayloadName + "." + c.IPTag + c.OutputExtension
+}
+
+// Name returns the name of the test case, relative to the test name.
+func (c TestCase) Name() string {
+	return c.PayloadName + ":" + c.IPTag
+}
+
+// FullName returns the full name of the test case, including the overall test
+// name.
+func (c TestCase) FullName() string {
+	return c.TestName + "/" + c.Name()
 }
 
 // Run tests your pipeline against all of the input files that we found in your
 // InputPath, comparing the values of the TestResult annotation with the
 // corresponding golden files in OutputPath.
 func (p *PipelineTest) Run(t *testing.T) {
-	for _, payloadName := range p.payloadNames() {
+	payloadNames, err := p.Testdata.GetPayloadNames()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outputExtension := p.OutputExtension
+	if outputExtension == "" {
+		outputExtension = ".json"
+	}
+
+	for _, payloadName := range payloadNames {
 		for _, ip := range []struct{ tag, remoteAddr string }{{"ipv4", ""}, {"ipv6", "[2001:db8::2]:1234"}} {
-			t.Run(p.TestName+":"+payloadName+":"+ip.tag, func(t *testing.T) {
-				payload := p.inputPayload(payloadName)
+			testCase := TestCase{p.TestName, payloadName, ip.tag, outputExtension}
+			t.Run(testCase.Name(), func(t *testing.T) {
+				payload, err := p.Testdata.LoadInputFile(testCase)
+				if err != nil {
+					t.Fatal(err)
+					return
+				}
+
 				request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(payload))
 				request.Header.Add("Content-Type", "application/report")
 				if ip.remoteAddr != "" {
@@ -210,7 +183,10 @@ func (p *PipelineTest) Run(t *testing.T) {
 					t.Errorf("TestResult(%s:%s) got %v, wanted []byte", payloadName, ip.tag, result)
 				}
 
-				want := p.expectedOutput(payloadName, ip.tag, got)
+				want, err := p.Testdata.LoadOutputFile(testCase, got)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if diff := diff.Diff((string)(want), (string)(got)); diff != "" {
 					t.Errorf("TestResult(%s:%s) got diff (want → got):\n%s", payloadName, ip.tag, diff)
 					return
@@ -218,6 +194,116 @@ func (p *PipelineTest) Run(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestdataLoader is a helper interface that PipelineTest uses to find, read,
+// and write the testdata and golden files for a set of test cases.
+type TestdataLoader interface {
+	// GetPayloadNames finds all available input files and returns their
+	// PayloadNames.
+	GetPayloadNames() ([]string, error)
+
+	// LoadInputFile loads in the content of the input file for a particular test
+	// case.
+	LoadInputFile(testCase TestCase) ([]byte, error)
+
+	// LoadOutputFile loads in the content of the golden output file for a
+	// particular test case.  If the test is run in "update" mode (which is up to
+	// you to decide, typically via an `--update` flag), then you should replace
+	// any existing content with `got`, and then return `got`.
+	LoadOutputFile(testCase TestCase, got []byte) ([]byte, error)
+}
+
+// DefaultTestdataLoader looks for test and golden data files in `testdata`
+// directories in the source packages being tested.
+//
+// We expect the following directory structure:
+//
+//   [InputPath]/
+//     testdata/
+//       reports/
+//         [PayloadName].json
+//   [OutputPath]/
+//     testdata/
+//       [TestName]/
+//         [PayloadName].[IPTag].[OutputExtension]
+//
+// InputPath and OutputPath both default to the current directory if empty,
+// which lines up with the `go test` convention of running test cases in the
+// directory of the package being tested.
+type DefaultTestdataLoader struct {
+	// The path containing the testdata directory where we can find the files
+	// containing the input report payloads.  For tests of package pipelinetest
+	// itself, the default value ("") is correct.  If you want to test processors
+	// in other packages, and reuse the input files from pipelinetest, set this to
+	// the directory containing pipelinetest's testdata directory.
+	InputPath string
+
+	// The path containing the testdata directory where we can find the golden
+	// files containing the expected output for your test case.  For most
+	// packages, the default value ("") is correct.
+	OutputPath string
+
+	// Whether to update the content of the golden files with the current actual
+	// test output.  You'll usually set this to the value of an `--update`
+	// command-line flag.
+	UpdateGoldenFiles bool
+}
+
+// GetPayloadNames returns the PayloadNames of any input files found in a
+// particular directory.  (This makes it easy to write TestdataLoader instances
+// that load input files from the local filesystem; all you have to do in your
+// GetPayloadNames method is identify the correct path, and then delegate to
+// this helper function.)
+func GetPayloadNames(basePath string) ([]string, error) {
+	var result []string
+	err := filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() && path != basePath {
+			return filepath.SkipDir
+		}
+		base := filepath.Base(path)
+		if filepath.Ext(base) != ".json" {
+			return nil
+		}
+		result = append(result, strings.TrimSuffix(base, ".json"))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetPayloadNames returns the PayloadNames of any input files found in
+// InputPath.
+func (l DefaultTestdataLoader) GetPayloadNames() ([]string, error) {
+	return GetPayloadNames(filepath.Join(l.InputPath, "testdata", "reports"))
+}
+
+// LoadInputFile loads the contents of an input file from InputPath.
+func (l DefaultTestdataLoader) LoadInputFile(testCase TestCase) ([]byte, error) {
+	path := filepath.Join(l.InputPath, "testdata", "reports", testCase.BaseInputFilename())
+	return ioutil.ReadFile(path)
+}
+
+// LoadOutputFile loads the contents of a golden file from OutputPath, updating
+// its contents with `got` if UpdateGoldenFiles is true.
+func (l DefaultTestdataLoader) LoadOutputFile(testCase TestCase, got []byte) ([]byte, error) {
+	path := filepath.Join(l.OutputPath, "testdata", testCase.TestName, testCase.BaseOutputFilename())
+	if l.UpdateGoldenFiles && got != nil {
+		err := os.MkdirAll(filepath.Dir(path), 0755)
+		if err != nil {
+			return nil, err
+		}
+		err = ioutil.WriteFile(path, got, 0644)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ioutil.ReadFile(path)
 }
 
 // EncodeBatchAsResult is a pipeline processor that saves a copy of the report
