@@ -23,8 +23,8 @@ import (
 )
 
 func TestHotSwapChangesWhichHandlerIsRun(t *testing.T) {
-	codeOkHandler := newDummy(http.StatusOK)
-	codeBadRequestHandler := newDummy(http.StatusBadRequest)
+	codeOkHandler := dummyHandler{http.StatusOK}
+	codeBadRequestHandler := dummyHandler{http.StatusBadRequest}
 
 	var hs collector.HotSwap
 	hs.Swap(codeOkHandler)
@@ -48,12 +48,6 @@ type dummyHandler struct {
 	statusCode int
 }
 
-func (d *dummyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (d dummyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(d.statusCode)
-}
-
-func newDummy(statusCode int) *dummyHandler {
-	var dummy dummyHandler
-	dummy.statusCode = statusCode
-	return &dummy
 }
