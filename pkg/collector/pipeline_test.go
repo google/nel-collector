@@ -35,7 +35,7 @@ func TestRespondsToOptionsRequest(t *testing.T) {
 	response := httptest.NewRecorder()
 	pipeline.ServeHTTP(response, request)
 	if want, got := "POST", response.Header().Get("Access-Control-Allow-Methods"); got != want {
-		t.Errorf("response.Header().Get(\"Access-Control-Allow-Method\"): got %v, want %v", got, want)
+		t.Errorf("response.Header().Get(\"Access-Control-Allow-Methods\"): got %v, want %v", got, want)
 	}
 	if want, got := "Content-Type", response.Header().Get("Access-Control-Allow-Headers"); got != want {
 		t.Errorf("response.Header().Get(\"Access-Control-Allow-Headers\"): got %v, want %v", got, want)

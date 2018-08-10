@@ -112,7 +112,7 @@ func (p *Pipeline) ProcessReports(w http.ResponseWriter, r *http.Request) *Repor
 	return &reports
 }
 
-// serveCORS handles OPTIONS requests by allowing POST requrests with a
+// serveCORS handles OPTIONS requests by allowing POST requests with a
 // Content-Type header from any origin.
 func serveCORS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "POST")
