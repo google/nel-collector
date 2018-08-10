@@ -112,8 +112,19 @@ func (p *Pipeline) ProcessReports(w http.ResponseWriter, r *http.Request) *Repor
 	return &reports
 }
 
+// serveCORS handles OPTIONS requests by allowing POST requests with a
+// Content-Type header from any origin.
+func serveCORS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Methods", "POST")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+}
+
 // ServeHTTP handles POST report uploads, extracting the payload and handing it
 // off to ProcessReports for processing.
 func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "OPTIONS" {
+		serveCORS(w, r)
+	}
 	p.ProcessReports(w, r)
 }
