@@ -51,7 +51,7 @@ func TestRespondsToOptionsRequest(t *testing.T) {
 	if want := ""; string(body) != want && err != nil {
 		t.Errorf("ReadAll(response.Result().Body): got %v, wanted \"\" with err %v", string(body), err)
 	}
-	if want, got := "POST", response.Header().Get("Access-Control-Allow-Method"); got != want {
+	if want, got := "POST", response.Header().Get("Access-Control-Allow-Methods"); got != want {
 		t.Errorf("response.Header().Get(\"Access-Control-Allow-Method\"): got %v, want %v", got, want)
 	}
 	if want, got := "Content-Type", response.Header().Get("Access-Control-Allow-Headers"); got != want {

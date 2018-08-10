@@ -27,7 +27,7 @@ type CORS struct {
 // CORS requests
 func (c *CORS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
-		w.Header().Set("Access-Control-Allow-Method", "POST")
+		w.Header().Set("Access-Control-Allow-Methods", "POST")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	} else {
