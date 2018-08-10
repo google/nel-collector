@@ -29,7 +29,23 @@ import (
 
 var validNelReportPath = filepath.Clean("../pipelinetest/testdata/reports/valid-nel-report.json")
 
-func TestIgnoreNonPOST(t *testing.T) {
+func TestRespondsToOptionsRequest(t *testing.T) {
+	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	request := httptest.NewRequest("OPTIONS", "https://example.com/upload", bytes.NewReader([]byte("")))
+	response := httptest.NewRecorder()
+	pipeline.ServeHTTP(response, request)
+	if want, got := "POST", response.Header().Get("Access-Control-Allow-Methods"); got != want {
+		t.Errorf("response.Header().Get(\"Access-Control-Allow-Method\"): got %v, want %v", got, want)
+	}
+	if want, got := "Content-Type", response.Header().Get("Access-Control-Allow-Headers"); got != want {
+		t.Errorf("response.Header().Get(\"Access-Control-Allow-Headers\"): got %v, want %v", got, want)
+	}
+	if want, got := "*", response.Header().Get("Access-Control-Allow-Origin"); got != want {
+		t.Errorf("response.Header().Get(\"Access-Control-Allow-Origin\"): got %v, want %v", got, want)
+	}
+}
+
+func TestIgnoreNonPOSTNonOPTIONS(t *testing.T) {
 	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
 	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(testdata(validNelReportPath)))
 	request.Header.Add("Content-Type", "application/report")
