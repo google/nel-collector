@@ -39,6 +39,8 @@ type NelReport struct {
 	ReportType string
 	// The URL of the request that this report describes.
 	URL string
+	// UserAgent represents the value of the User-Agent header in the request that the report is about
+	UserAgent string
 	// The referrer information of the request, as determined by the
 	// referrer policy associated with its client.
 	Referrer string
@@ -49,11 +51,16 @@ type NelReport struct {
 	ServerIP string
 	// The ALPN ID  of the network protocol used to fetch the resource.
 	Protocol string
+	// The method of the HTTP request (e.g. GET, POST)
+	Method string
 	// The status code of the HTTP response, if available.
 	StatusCode int
 	// The elapsed number of milliseconds between the start of the resource
 	// fetch and when it was aborted by the user agent.
 	ElapsedTime int
+	// The phase of the request in which the failure occurred. One of
+	// {dns, connection, application}; a successful request always has a value of application
+	Phase string
 	// The description of the error type.  For reports about successful
 	// requests, this will be "ok".  See the NEL spec for the authoritative
 	// list of possible values for failed requests.
@@ -71,17 +78,19 @@ type rawReport struct {
 	Age        int             `json:"age"`
 	ReportType string          `json:"type"`
 	URL        string          `json:"url"`
+	UserAgent  string          `json:"user_agent"`
 	Body       json.RawMessage `json:"body"`
 }
 
 type nelReportBody struct {
-	URI              string  `json:"uri"`
 	Referrer         string  `json:"referrer"`
-	SamplingFraction float32 `json:"sampling-fraction"`
-	ServerIP         string  `json:"server-ip"`
+	SamplingFraction float32 `json:"sampling_fraction"`
+	ServerIP         string  `json:"server_ip"`
 	Protocol         string  `json:"protocol"`
-	StatusCode       int     `json:"status-code"`
-	ElapsedTime      int     `json:"elapsed-time"`
+	Method           string  `json:"method"`
+	StatusCode       int     `json:"status_code"`
+	ElapsedTime      int     `json:"elapsed_time"`
+	Phase            string  `json:"phase"`
 	Type             string  `json:"type"`
 }
 
@@ -97,6 +106,7 @@ func (r *NelReport) UnmarshalJSON(b []byte) error {
 	r.Age = raw.Age
 	r.ReportType = raw.ReportType
 	r.URL = raw.URL
+	r.UserAgent = raw.UserAgent
 
 	if raw.ReportType == "network-error" {
 		var body nelReportBody
@@ -108,8 +118,10 @@ func (r *NelReport) UnmarshalJSON(b []byte) error {
 		r.SamplingFraction = body.SamplingFraction
 		r.ServerIP = body.ServerIP
 		r.Protocol = body.Protocol
+		r.Method = body.Method
 		r.StatusCode = body.StatusCode
 		r.ElapsedTime = body.ElapsedTime
+		r.Phase = body.Phase
 		r.Type = body.Type
 	} else {
 		r.RawBody = raw.Body
@@ -126,13 +138,14 @@ func (r NelReport) MarshalJSON() ([]byte, error) {
 	var err error
 	if r.ReportType == "network-error" {
 		body, err = json.Marshal(nelReportBody{
-			URI:              r.URL,
 			Referrer:         r.Referrer,
 			SamplingFraction: r.SamplingFraction,
 			ServerIP:         r.ServerIP,
 			Protocol:         r.Protocol,
+			Method:           r.Method,
 			StatusCode:       r.StatusCode,
 			ElapsedTime:      r.ElapsedTime,
+			Phase:            r.Phase,
 			Type:             r.Type,
 		})
 		if err != nil {
@@ -146,6 +159,7 @@ func (r NelReport) MarshalJSON() ([]byte, error) {
 		Age:        r.Age,
 		ReportType: r.ReportType,
 		URL:        r.URL,
+		UserAgent:  r.UserAgent,
 		Body:       body,
 	})
 }

@@ -3,14 +3,16 @@
     "age": 500,
     "type": "network-error",
     "url": "https://example.com/about/",
+    "user_agent": "Mozilla/5.0",
     "body": {
-      "uri": "https://example.com/about/",
       "referrer": "https://example.com/",
-      "sampling-fraction": 0.5,
-      "server-ip": "203.0.113.75",
+      "sampling_fraction": 0.5,
+      "server_ip": "203.0.113.75",
       "protocol": "h2",
-      "status-code": 200,
-      "elapsed-time": 45,
+      "method": "POST",
+      "status_code": 200,
+      "elapsed_time": 45,
+      "phase":"application",
       "type": "ok"
     }
   }
