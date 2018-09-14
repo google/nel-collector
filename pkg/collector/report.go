@@ -51,15 +51,15 @@ type NelReport struct {
 	ServerIP string
 	// The ALPN ID  of the network protocol used to fetch the resource.
 	Protocol string
-	//The method of the HTTP request (e.g. GET, POST)
+	// The method of the HTTP request (e.g. GET, POST)
 	Method string
 	// The status code of the HTTP response, if available.
 	StatusCode int
 	// The elapsed number of milliseconds between the start of the resource
 	// fetch and when it was aborted by the user agent.
 	ElapsedTime int
-	//The phase of the request in which the failure occurred. One of
-	//{dns, connection, application}; a successful request always has a value of application
+	// The phase of the request in which the failure occurred. One of
+	// {dns, connection, application}; a successful request always has a value of application
 	Phase string
 	// The description of the error type.  For reports about successful
 	// requests, this will be "ok".  See the NEL spec for the authoritative
