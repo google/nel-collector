@@ -43,6 +43,9 @@ func TestRespondsToOptionsRequest(t *testing.T) {
 	if want, got := "*", response.Header().Get("Access-Control-Allow-Origin"); got != want {
 		t.Errorf("response.Header().Get(\"Access-Control-Allow-Origin\"): got %v, want %v", got, want)
 	}
+	if want, got := 200, response.Result().StatusCode; got != want {
+		t.Errorf("response.Result().StatusCode: got %v, want %v", got, want)
+	}
 }
 
 func TestIgnoreNonPOSTNonOPTIONS(t *testing.T) {
