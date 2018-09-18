@@ -125,6 +125,7 @@ func serveCORS(w http.ResponseWriter, r *http.Request) {
 func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		serveCORS(w, r)
+		return
 	}
 	p.ProcessReports(w, r)
 }
