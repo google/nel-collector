@@ -83,6 +83,7 @@ func (p *Pipeline) AddProcessor(processor ReportProcessor) {
 	p.processors = append(p.processors, processor)
 }
 
+// SetContextGetter overrides the default (or current) ContextGetter with cg.
 func (p *Pipeline) SetContextGetter(cg ContextGetter) {
 	p.ctxGetter = cg
 }
