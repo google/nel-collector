@@ -15,6 +15,8 @@
 package core
 
 import (
+	"context"
+
 	"github.com/BurntSushi/toml"
 	"github.com/google/nel-collector/pkg/collector"
 )
@@ -23,7 +25,7 @@ import (
 type KeepNelReports struct{}
 
 // ProcessReports throws away any non-NEL reports.
-func (KeepNelReports) ProcessReports(batch *collector.ReportBatch) {
+func (KeepNelReports) ProcessReports(ctx context.Context, batch *collector.ReportBatch) {
 	var filtered []collector.NelReport
 	for _, report := range batch.Reports {
 		if report.ReportType == "network-error" {
