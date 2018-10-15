@@ -8,7 +8,7 @@ server logs, but collected from your clients.  This client-side data set will
 include information about failed requests that never made it to your serving
 infrastructure.
 
-[Reporting]: https://wicg.github.io/reporting/
+[Reporting]: https://wicg.github.io/reporting//
 [Network Error Logging]: https://wicg.github.io/network-error-logging/
 
 This repository provides a full working implementation of the collector side of
