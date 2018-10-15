@@ -16,6 +16,7 @@ package collector_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -100,7 +101,7 @@ var serverZones = map[string]string{
 
 type geoAnnotator struct{}
 
-func (g geoAnnotator) ProcessReports(batch *collector.ReportBatch) {
+func (g geoAnnotator) ProcessReports(ctx context.Context, batch *collector.ReportBatch) {
 	batch.SetAnnotation("ClientCountry", clientCountries[batch.ClientIP])
 	for i := range batch.Reports {
 		batch.Reports[i].SetAnnotation("ServerZone", serverZones[batch.Reports[i].ServerIP])

@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -29,7 +30,7 @@ type ReportProcessor interface {
 	// ProcessReports handles a single batch of reports.  You have full control
 	// over the contents of the batch; for instance, you can remove elements or
 	// update their contents, if appropriate.
-	ProcessReports(batch *ReportBatch)
+	ProcessReports(ctx context.Context, batch *ReportBatch)
 }
 
 // Clock lets you override how a pipeline assigns timestamps to each report.
@@ -45,11 +46,27 @@ func (c nowClock) Now() time.Time {
 	return time.Now()
 }
 
+// ContextGetter extracts a context from a http.Request. This allows for more
+// complex logic for getting a context beyond r.Context()
+type ContextGetter interface {
+	Context(r *http.Request) context.Context
+}
+
+// DefaultContextGetter implements a ContextGetter that gets the context
+// contained directly within the request
+type DefaultContextGetter struct{}
+
+// Context returns the context contained directly within the request.
+func (d DefaultContextGetter) Context(r *http.Request) context.Context {
+	return r.Context()
+}
+
 var defaultClock nowClock
 
 // Pipeline is a series of processors that should be applied to each report that
 // the collector receives.
 type Pipeline struct {
+	ctxGetter  ContextGetter
 	processors []ReportProcessor
 	clock      Clock
 }
@@ -58,7 +75,7 @@ type Pipeline struct {
 // production pipelines, just instantiate the Pipeline type yourself
 // (&Pipeline{}).
 func NewPipeline(clock Clock) *Pipeline {
-	return &Pipeline{clock: clock}
+	return &Pipeline{ctxGetter: DefaultContextGetter{}, clock: clock}
 }
 
 // AddProcessor adds a new processor to the pipeline.
@@ -66,10 +83,14 @@ func (p *Pipeline) AddProcessor(processor ReportProcessor) {
 	p.processors = append(p.processors, processor)
 }
 
+func (p *Pipeline) SetContextGetter(cg ContextGetter) {
+	p.ctxGetter = cg
+}
+
 // ProcessReports extracts reports from a POST upload payload, as defined by the
 // Reporting spec, and runs all of the processors in the pipeline against each
 // report.
-func (p *Pipeline) ProcessReports(w http.ResponseWriter, r *http.Request) *ReportBatch {
+func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r *http.Request) *ReportBatch {
 	if r.Method != "POST" {
 		http.Error(w, "Must use POST to upload reports", http.StatusMethodNotAllowed)
 		return nil
@@ -105,7 +126,7 @@ func (p *Pipeline) ProcessReports(w http.ResponseWriter, r *http.Request) *Repor
 	}
 
 	for _, publisher := range p.processors {
-		publisher.ProcessReports(&reports)
+		publisher.ProcessReports(ctx, &reports)
 	}
 	// 204 isn't an error, per-se, but this does the right thing.
 	http.Error(w, "", http.StatusNoContent)
@@ -127,5 +148,6 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		serveCORS(w, r)
 		return
 	}
-	p.ProcessReports(w, r)
+	ctx := p.ctxGetter.Context(r)
+	p.ProcessReports(ctx, w, r)
 }

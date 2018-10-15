@@ -18,6 +18,7 @@ package pipelinetest
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -162,7 +163,7 @@ func (p *PipelineTest) Run(t *testing.T) {
 				}
 
 				var response httptest.ResponseRecorder
-				batch := p.Pipeline.ProcessReports(&response, request)
+				batch := p.Pipeline.ProcessReports(context.Background(), &response, request)
 				if response.Code != http.StatusNoContent {
 					t.Errorf("ProcessReports(%s:%s) got status code %d, wanted %d", payloadName, ip.tag, response.Code, http.StatusNoContent)
 					return
@@ -314,7 +315,7 @@ type EncodeBatchAsResult struct{}
 
 // ProcessReports saves a copy of the report batch into the TestResult
 // annotation.
-func (e EncodeBatchAsResult) ProcessReports(batch *collector.ReportBatch) {
+func (e EncodeBatchAsResult) ProcessReports(ctx context.Context, batch *collector.ReportBatch) {
 	encoded, _ := collector.EncodeRawBatch(batch)
 	batch.SetAnnotation("TestResult", encoded)
 }

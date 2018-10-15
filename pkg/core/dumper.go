@@ -15,6 +15,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -32,7 +33,7 @@ type DumpReportsAsCLF struct {
 }
 
 // ProcessReports prints out a summary of each report in the batch.
-func (d DumpReportsAsCLF) ProcessReports(batch *collector.ReportBatch) {
+func (d DumpReportsAsCLF) ProcessReports(ctx context.Context, batch *collector.ReportBatch) {
 	writer := d.Writer
 	if writer == nil {
 		writer = batch.AnnotationWriter("TestResult")
