@@ -52,12 +52,12 @@ type ContextGetter interface {
 	Context(r *http.Request) context.Context
 }
 
-// DefaultContextGetter implements a ContextGetter that gets the context
+// defaultContextGetter implements a ContextGetter that gets the context
 // contained directly within the request
-type DefaultContextGetter struct{}
+type defaultContextGetter struct{}
 
 // Context returns the context contained directly within the request.
-func (d DefaultContextGetter) Context(r *http.Request) context.Context {
+func (d defaultContextGetter) Context(r *http.Request) context.Context {
 	return r.Context()
 }
 
