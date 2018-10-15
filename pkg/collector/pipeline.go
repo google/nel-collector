@@ -75,7 +75,7 @@ type Pipeline struct {
 // production pipelines, just instantiate the Pipeline type yourself
 // (&Pipeline{}).
 func NewPipeline(clock Clock) *Pipeline {
-	return &Pipeline{ctxGetter: DefaultContextGetter{}, clock: clock}
+	return &Pipeline{ctxGetter: defaultContextGetter{}, clock: clock}
 }
 
 // AddProcessor adds a new processor to the pipeline.
