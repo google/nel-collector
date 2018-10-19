@@ -44,7 +44,7 @@ func (d DumpReportsAsCLF) ProcessReports(ctx context.Context, batch *collector.R
 func init() {
 	collector.RegisterReportLoaderFunc(
 		"DumpReportsAsCLF",
-		func(configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
+		func(_ context.Context, configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
 			var config struct {
 				Dest string `toml:"dest"`
 			}

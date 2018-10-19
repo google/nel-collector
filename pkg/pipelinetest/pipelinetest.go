@@ -58,7 +58,7 @@ func (c SimulatedClock) Now() time.Time {
 // This is especially useful in test cases, along with PipelineTest.
 func NewTestConfigPipeline(configString string) *collector.Pipeline {
 	p := collector.NewPipeline(NewSimulatedClock())
-	err := p.LoadFromConfig([]byte(configString))
+	err := p.LoadFromConfig(context.Background(), []byte(configString))
 	if err != nil {
 		log.Fatal(err)
 		return nil
@@ -323,7 +323,7 @@ func (e EncodeBatchAsResult) ProcessReports(ctx context.Context, batch *collecto
 func init() {
 	collector.RegisterReportLoaderFunc(
 		"EncodeBatchAsResult",
-		func(configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
+		func(_ context.Context, configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
 			return EncodeBatchAsResult{}, nil
 		})
 }

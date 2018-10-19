@@ -38,7 +38,7 @@ func (KeepNelReports) ProcessReports(ctx context.Context, batch *collector.Repor
 func init() {
 	collector.RegisterReportLoaderFunc(
 		"KeepNelReports",
-		func(configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
+		func(_ context.Context, configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
 			return KeepNelReports{}, nil
 		})
 }
