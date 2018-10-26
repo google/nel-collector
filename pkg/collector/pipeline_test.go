@@ -52,7 +52,7 @@ func TestRespondsToOptionsRequest(t *testing.T) {
 func TestIgnoreNonPOSTNonOPTIONS(t *testing.T) {
 	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
 	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(testdata(validNelReportPath)))
-	request.Header.Add("Content-Type", "application/report")
+	request.Header.Add("Content-Type", "application/reports+json")
 	var response httptest.ResponseRecorder
 	pipeline.ServeHTTP(&response, request)
 	if want := http.StatusMethodNotAllowed; response.Code != want {

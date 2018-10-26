@@ -157,7 +157,7 @@ func (p *PipelineTest) Run(t *testing.T) {
 				}
 
 				request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(payload))
-				request.Header.Add("Content-Type", "application/report")
+				request.Header.Add("Content-Type", "application/reports+json")
 				if ip.remoteAddr != "" {
 					request.RemoteAddr = ip.remoteAddr
 				}
