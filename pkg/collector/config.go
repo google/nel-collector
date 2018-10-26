@@ -92,11 +92,21 @@ type ReportLoader interface {
 }
 
 // ReportLoaderFunc allows you to register a simple function as a ReportLoader.
-type ReportLoaderFunc func(ctx context.Context, config toml.Primitive) (ReportProcessor, error)
+type ReportLoaderFunc func(config toml.Primitive) (ReportProcessor, error)
 
 // Load defers to a ReportLoaderFunc to load a ReportProcessor from the contents
 // of a configuration file.
 func (f ReportLoaderFunc) Load(ctx context.Context, config toml.Primitive) (ReportProcessor, error) {
+	return f(config)
+}
+
+// ContextReportLoaderFunc allows you to register a simple function (which needs
+// access to a Context) as a ReportLoader.
+type ContextReportLoaderFunc func(ctx context.Context, config toml.Primitive) (ReportProcessor, error)
+
+// Load defers to a ContextReportLoaderFunc to load a ReportProcessor from the
+// contents of a configuration file.
+func (f ContextReportLoaderFunc) Load(ctx context.Context, config toml.Primitive) (ReportProcessor, error) {
 	return f(ctx, config)
 }
 
@@ -110,6 +120,12 @@ func RegisterReportLoader(name string, loader ReportLoader) {
 
 // RegisterReportLoaderFunc registers a function that can load a particular kind
 // of report processor.
-func RegisterReportLoaderFunc(name string, loader func(ctx context.Context, config toml.Primitive) (ReportProcessor, error)) {
+func RegisterReportLoaderFunc(name string, loader func(config toml.Primitive) (ReportProcessor, error)) {
 	RegisterReportLoader(name, ReportLoaderFunc(loader))
+}
+
+// RegisterContextReportLoaderFunc registers a context-aware function that can
+// load a particular kind of report processor.
+func RegisterContextReportLoaderFunc(name string, loader func(ctx context.Context, config toml.Primitive) (ReportProcessor, error)) {
+	RegisterReportLoader(name, ContextReportLoaderFunc(loader))
 }

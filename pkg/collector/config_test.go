@@ -47,7 +47,7 @@ var badConfigCases = []struct {
 
 func TestBadConfig(t *testing.T) {
 	// Register a known processor type that always throws an error
-	collector.RegisterReportLoaderFunc("AlwaysThrowsError", func(_ context.Context, config toml.Primitive) (collector.ReportProcessor, error) {
+	collector.RegisterReportLoaderFunc("AlwaysThrowsError", func(config toml.Primitive) (collector.ReportProcessor, error) {
 		return nil, fmt.Errorf("this will never work")
 	})
 	for _, c := range badConfigCases {

@@ -323,7 +323,7 @@ func (e EncodeBatchAsResult) ProcessReports(ctx context.Context, batch *collecto
 func init() {
 	collector.RegisterReportLoaderFunc(
 		"EncodeBatchAsResult",
-		func(_ context.Context, configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
+		func(configPrimitive toml.Primitive) (collector.ReportProcessor, error) {
 			return EncodeBatchAsResult{}, nil
 		})
 }
