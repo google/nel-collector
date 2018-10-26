@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/BurntSushi/toml"
@@ -36,7 +37,7 @@ import (
 //
 // The `type` field of each element identifies which kind of processor to add;
 // any additional fields let you specify any processor-specific configuration.
-func (p *Pipeline) LoadFromConfig(configBytes []byte) error {
+func (p *Pipeline) LoadFromConfig(ctx context.Context, configBytes []byte) error {
 
 	var config struct {
 		Processors []toml.Primitive `toml:"processor"`
@@ -73,7 +74,7 @@ func (p *Pipeline) LoadFromConfig(configBytes []byte) error {
 			return fmt.Errorf("Unknown processor type %s for processor %d", processorConfig.Type, idx)
 		}
 
-		processor, err := loader.Load(processorPrimitive)
+		processor, err := loader.Load(ctx, processorPrimitive)
 		if err != nil {
 			return fmt.Errorf("Couldn't create a %s for processor %d: %v", processorConfig.Type, idx, err)
 		}
@@ -87,7 +88,7 @@ func (p *Pipeline) LoadFromConfig(configBytes []byte) error {
 // ReportLoader is an interface that knows how to load a ReportProcessor at
 // runtime via the contents of a TOML configuration file.
 type ReportLoader interface {
-	Load(config toml.Primitive) (ReportProcessor, error)
+	Load(ctx context.Context, config toml.Primitive) (ReportProcessor, error)
 }
 
 // ReportLoaderFunc allows you to register a simple function as a ReportLoader.
@@ -95,8 +96,18 @@ type ReportLoaderFunc func(config toml.Primitive) (ReportProcessor, error)
 
 // Load defers to a ReportLoaderFunc to load a ReportProcessor from the contents
 // of a configuration file.
-func (f ReportLoaderFunc) Load(config toml.Primitive) (ReportProcessor, error) {
+func (f ReportLoaderFunc) Load(ctx context.Context, config toml.Primitive) (ReportProcessor, error) {
 	return f(config)
+}
+
+// ContextReportLoaderFunc allows you to register a simple function (which needs
+// access to a Context) as a ReportLoader.
+type ContextReportLoaderFunc func(ctx context.Context, config toml.Primitive) (ReportProcessor, error)
+
+// Load defers to a ContextReportLoaderFunc to load a ReportProcessor from the
+// contents of a configuration file.
+func (f ContextReportLoaderFunc) Load(ctx context.Context, config toml.Primitive) (ReportProcessor, error) {
+	return f(ctx, config)
 }
 
 var reportLoaders = make(map[string]ReportLoader)
@@ -111,4 +122,10 @@ func RegisterReportLoader(name string, loader ReportLoader) {
 // of report processor.
 func RegisterReportLoaderFunc(name string, loader func(config toml.Primitive) (ReportProcessor, error)) {
 	RegisterReportLoader(name, ReportLoaderFunc(loader))
+}
+
+// RegisterContextReportLoaderFunc registers a context-aware function that can
+// load a particular kind of report processor.
+func RegisterContextReportLoaderFunc(name string, loader func(ctx context.Context, config toml.Primitive) (ReportProcessor, error)) {
+	RegisterReportLoader(name, ContextReportLoaderFunc(loader))
 }

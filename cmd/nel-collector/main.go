@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -55,7 +56,7 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	pipeline := &collector.Pipeline{}
-	err := pipeline.LoadFromConfig(defaultConfig)
+	err := pipeline.LoadFromConfig(context.Background(), defaultConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

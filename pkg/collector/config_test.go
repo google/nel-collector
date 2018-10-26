@@ -15,6 +15,7 @@
 package collector_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -42,6 +43,8 @@ var badConfigCases = []struct {
 		"Unknown processor type UnknownType for processor 0"},
 	{"ErrorLoadingProcessor", `processor = [{type = "AlwaysThrowsError"}]`,
 		"Couldn't create a AlwaysThrowsError for processor 0: this will never work"},
+	{"ErrorLoadingContextProcessor", `processor = [{type = "AlwaysThrowsErrorWithContext"}]`,
+		"Couldn't create a AlwaysThrowsErrorWithContext for processor 0: this will never work"},
 }
 
 func TestBadConfig(t *testing.T) {
@@ -49,10 +52,15 @@ func TestBadConfig(t *testing.T) {
 	collector.RegisterReportLoaderFunc("AlwaysThrowsError", func(config toml.Primitive) (collector.ReportProcessor, error) {
 		return nil, fmt.Errorf("this will never work")
 	})
+	// And another one that always throws an error while taking in a Context
+	// parameter (even though it doesn't do anything with it.)
+	collector.RegisterContextReportLoaderFunc("AlwaysThrowsErrorWithContext", func(_ context.Context, config toml.Primitive) (collector.ReportProcessor, error) {
+		return nil, fmt.Errorf("this will never work")
+	})
 	for _, c := range badConfigCases {
 		t.Run("BadConfig:"+c.name, func(t *testing.T) {
 			var pipeline collector.Pipeline
-			err := pipeline.LoadFromConfig([]byte(c.configYaml))
+			err := pipeline.LoadFromConfig(context.Background(), []byte(c.configYaml))
 			if err == nil {
 				t.Errorf("LoadFromConfig(%v) should return error", c.configYaml)
 			}
