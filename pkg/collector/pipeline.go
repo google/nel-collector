@@ -46,27 +46,11 @@ func (c nowClock) Now() time.Time {
 	return time.Now()
 }
 
-// ContextGetter extracts a context from a http.Request. This allows for more
-// complex logic for getting a context beyond r.Context()
-type ContextGetter interface {
-	Context(r *http.Request) context.Context
-}
-
-// defaultContextGetter implements a ContextGetter that gets the context
-// contained directly within the request
-type defaultContextGetter struct{}
-
-// Context returns the context contained directly within the request.
-func (d defaultContextGetter) Context(r *http.Request) context.Context {
-	return r.Context()
-}
-
 var defaultClock nowClock
 
 // Pipeline is a series of processors that should be applied to each report that
 // the collector receives.
 type Pipeline struct {
-	ctxGetter  ContextGetter
 	processors []ReportProcessor
 	clock      Clock
 }
@@ -75,17 +59,12 @@ type Pipeline struct {
 // production pipelines, just instantiate the Pipeline type yourself
 // (&Pipeline{}).
 func NewPipeline(clock Clock) *Pipeline {
-	return &Pipeline{ctxGetter: defaultContextGetter{}, clock: clock}
+	return &Pipeline{clock: clock}
 }
 
 // AddProcessor adds a new processor to the pipeline.
 func (p *Pipeline) AddProcessor(processor ReportProcessor) {
 	p.processors = append(p.processors, processor)
-}
-
-// SetContextGetter overrides the default (or current) ContextGetter with cg.
-func (p *Pipeline) SetContextGetter(cg ContextGetter) {
-	p.ctxGetter = cg
 }
 
 // ProcessReports extracts reports from a POST upload payload, as defined by the
@@ -149,6 +128,6 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		serveCORS(w, r)
 		return
 	}
-	ctx := p.ctxGetter.Context(r)
+	ctx := r.Context()
 	p.ProcessReports(ctx, w, r)
 }
