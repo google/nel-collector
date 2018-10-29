@@ -77,8 +77,8 @@ func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r 
 	}
 
 	contentType := r.Header.Get("Content-Type")
-	if contentType != "application/report" {
-		http.Error(w, "Must use application/report to upload reports", http.StatusBadRequest)
+	if contentType != "application/reports+json" {
+		http.Error(w, "Must use application/reports+json to upload reports", http.StatusBadRequest)
 		return nil
 	}
 
