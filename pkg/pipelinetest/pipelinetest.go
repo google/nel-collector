@@ -90,6 +90,10 @@ type PipelineTest struct {
 	// The loader that will be used to read input and output files for each test
 	// case.
 	Testdata TestdataLoader
+
+	// The upload url to be passed to the processor. If no value is provided, the
+	// default upload URL of https://example.com/upload/ is used.
+	URL string
 }
 
 // TestCase describes one test case managed by a PipelineTest.
@@ -134,7 +138,8 @@ func (c TestCase) FullName() string {
 
 // Run tests your pipeline against all of the input files that we found in your
 // InputPath, comparing the values of the TestResult annotation with the
-// corresponding golden files in OutputPath.
+// corresponding golden files in OutputPath. It uses the default upload URL of
+// https://example.com/upload/
 func (p *PipelineTest) Run(t *testing.T) {
 	payloadNames, err := p.Testdata.GetPayloadNames()
 	if err != nil {
@@ -144,6 +149,10 @@ func (p *PipelineTest) Run(t *testing.T) {
 	outputExtension := p.OutputExtension
 	if outputExtension == "" {
 		outputExtension = ".json"
+	}
+	url := p.URL
+	if url == "" {
+		url = "https://example.com/upload/"
 	}
 
 	for _, payloadName := range payloadNames {
@@ -156,7 +165,7 @@ func (p *PipelineTest) Run(t *testing.T) {
 					return
 				}
 
-				request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(payload))
+				request := httptest.NewRequest("POST", url, bytes.NewReader(payload))
 				request.Header.Add("Content-Type", "application/reports+json")
 				if ip.remoteAddr != "" {
 					request.RemoteAddr = ip.remoteAddr
