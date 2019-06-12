@@ -192,6 +192,8 @@ type ReportBatch struct {
 	Annotations
 }
 
+// NewReportBatch takes a HTTP request and a clock and fills in a ReportBatch,
+// returning an error if parsing fails.
 func NewReportBatch(r *http.Request, clock Clock) (*ReportBatch, error) {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
