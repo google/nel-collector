@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"time"
@@ -188,6 +190,25 @@ type ReportBatch struct {
 	// An arbitrary set of extra data that you can attach to this batch of
 	// reports.
 	Annotations
+}
+
+func NewReportBatch(r *http.Request, clock Clock) (*ReportBatch, error) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return nil, fmt.Errorf("net.SplitHostPort(%v): %v", r.RemoteAddr, err)
+	}
+
+	var reports ReportBatch
+	reports.Time = clock.Now()
+	reports.CollectorURL = *r.URL
+	reports.ClientIP = host
+	reports.ClientUserAgent = r.Header.Get("User-Agent")
+	decoder := json.NewDecoder(r.Body)
+	err = decoder.Decode(&reports.Reports)
+	if err != nil {
+		return nil, fmt.Errorf("decoder.Decode(&reports.Reports): %v", err)
+	}
+	return &reports, nil
 }
 
 // PrintBatchAsCLF prints out a summary of each report in the batch using a

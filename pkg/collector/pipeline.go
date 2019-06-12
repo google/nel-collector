@@ -16,8 +16,6 @@ package collector
 
 import (
 	"context"
-	"encoding/json"
-	"net"
 	"net/http"
 	"time"
 )
@@ -82,35 +80,23 @@ func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r 
 		return nil
 	}
 
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return nil
-	}
-
 	clock := p.clock
 	if clock == nil {
 		clock = defaultClock
 	}
 
-	var reports ReportBatch
-	reports.Time = clock.Now()
-	reports.CollectorURL = *r.URL
-	reports.ClientIP = host
-	reports.ClientUserAgent = r.Header.Get("User-Agent")
-	decoder := json.NewDecoder(r.Body)
-	err = decoder.Decode(&reports.Reports)
+	reports, err := NewReportBatch(r, clock)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return nil
 	}
 
 	for _, publisher := range p.processors {
-		publisher.ProcessReports(ctx, &reports)
+		publisher.ProcessReports(ctx, reports)
 	}
 	// 204 isn't an error, per-se, but this does the right thing.
 	http.Error(w, "", http.StatusNoContent)
-	return &reports
+	return reports
 }
 
 // serveCORS handles OPTIONS requests by allowing POST requests with a
