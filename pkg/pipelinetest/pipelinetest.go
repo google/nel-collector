@@ -57,7 +57,7 @@ func (c SimulatedClock) Now() time.Time {
 // if there are any errors parsing it, or configuring the pipeline's processors.
 // This is especially useful in test cases, along with PipelineTest.
 func NewTestConfigPipeline(configString string) *collector.Pipeline {
-	p := collector.NewPipeline(NewSimulatedClock())
+	p := collector.NewTestPipeline(NewSimulatedClock())
 	err := p.LoadFromConfig(context.Background(), []byte(configString))
 	if err != nil {
 		log.Fatal(err)
@@ -155,6 +155,10 @@ func (p *PipelineTest) Run(t *testing.T) {
 		url = "https://example.com/upload/"
 	}
 
+	const chanSize = 100
+	c := make(chan *collector.ReportBatch, chanSize)
+	p.Pipeline.AddProcessor(extractReports{c})
+
 	for _, payloadName := range payloadNames {
 		for _, ip := range []struct{ tag, remoteAddr string }{{"ipv4", ""}, {"ipv6", "[2001:db8::2]:1234"}} {
 			testCase := TestCase{p.TestName, payloadName, ip.tag, outputExtension}
@@ -172,7 +176,10 @@ func (p *PipelineTest) Run(t *testing.T) {
 				}
 
 				var response httptest.ResponseRecorder
-				batch := p.Pipeline.ProcessReports(context.Background(), &response, request)
+				p.Pipeline.ProcessReports(context.Background(), &response, request)
+				log.Printf("jarls about to read from channel")
+				batch := <-c
+				log.Printf("jarls read from channel")
 				if response.Code != http.StatusNoContent {
 					t.Errorf("ProcessReports(%s:%s) got status code %d, wanted %d", payloadName, ip.tag, response.Code, http.StatusNoContent)
 					return
@@ -327,6 +334,20 @@ type EncodeBatchAsResult struct{}
 func (e EncodeBatchAsResult) ProcessReports(ctx context.Context, batch *collector.ReportBatch) {
 	encoded, _ := collector.EncodeRawBatch(batch)
 	batch.SetAnnotation("TestResult", encoded)
+}
+
+type extractReports struct {
+	c chan *collector.ReportBatch
+}
+
+func newExtractReports() *extractReports {
+	return &extractReports{make(chan *collector.ReportBatch, 100)}
+}
+
+func (e extractReports) ProcessReports(ctx context.Context, batch *collector.ReportBatch) {
+	log.Printf("jarls about to write to channel")
+	e.c <- batch
+	log.Printf("jarls wrote to channel")
 }
 
 func init() {

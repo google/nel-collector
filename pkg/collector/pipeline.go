@@ -49,17 +49,41 @@ func (c nowClock) Now() time.Time {
 var defaultClock nowClock
 
 // Pipeline is a series of processors that should be applied to each report that
-// the collector receives.
+// the collector receives. It uses a fixed number of workers to process the reports
+// and a fixed sized queue that the workers read from. If the queue fills, reports
+// are dropped.
 type Pipeline struct {
 	processors []ReportProcessor
 	clock      Clock
+	c          chan *ReportBatch
 }
 
-// NewPipeline creates a new Pipeline that uses a particular clock.  For
-// production pipelines, just instantiate the Pipeline type yourself
-// (&Pipeline{}).
-func NewPipeline(clock Clock) *Pipeline {
-	return &Pipeline{clock: clock}
+// NewPipeline creates a new Pipeline with a specified buffer size.
+func NewPipeline(bufferSize int64, numWorkers int) *Pipeline {
+	return setupPipeline(context.Background(), nil, bufferSize, numWorkers)
+}
+
+const defaultBufferSize = 1000
+const defaultNumWorkers = 10
+
+// NewTestPipeline creates a new Pipeline with a specified clock.
+// This should only be used for testing.
+func NewTestPipeline(clock Clock) *Pipeline {
+	return setupPipeline(context.Background(), clock, defaultBufferSize, defaultNumWorkers)
+}
+
+// NewTestPipelineWithBuffer creates a new Pipeline with a specified buffer size and clock.
+// This should only be used for testing.
+func NewTestPipelineWithBuffer(clock Clock, bufferSize int64) *Pipeline {
+	return setupPipeline(context.Background(), clock, bufferSize, defaultNumWorkers)
+}
+
+func setupPipeline(ctx context.Context, clock Clock, bufferSize int64, numWorkers int) *Pipeline {
+	p := &Pipeline{clock: clock, c: make(chan *ReportBatch, bufferSize)}
+	for i := 0; i < numWorkers; i++ {
+		go p.runPipeline(ctx)
+	}
+	return p
 }
 
 // AddProcessor adds a new processor to the pipeline.
@@ -69,23 +93,24 @@ func (p *Pipeline) AddProcessor(processor ReportProcessor) {
 
 // ProcessReports extracts reports from a POST upload payload, as defined by the
 // Reporting spec, and runs all of the processors in the pipeline against each
-// report.
-func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r *http.Request) *ReportBatch {
+// report. Returns true if the request was dropped due to a full queue and false
+// otherwise.
+func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != "POST" {
 		http.Error(w, "Must use POST to upload reports", http.StatusMethodNotAllowed)
-		return nil
+		return false
 	}
 
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/reports+json" {
 		http.Error(w, "Must use application/reports+json to upload reports", http.StatusBadRequest)
-		return nil
+		return false
 	}
 
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return nil
+		return false
 	}
 
 	clock := p.clock
@@ -102,15 +127,27 @@ func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r 
 	err = decoder.Decode(&reports.Reports)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return nil
+		return true
 	}
 
-	for _, publisher := range p.processors {
-		publisher.ProcessReports(ctx, &reports)
+	var dropped bool
+	select {
+	case p.c <- &reports:
+		dropped = false
+	default:
+		dropped = true
 	}
 	// 204 isn't an error, per-se, but this does the right thing.
 	http.Error(w, "", http.StatusNoContent)
-	return &reports
+	return dropped
+}
+
+func (p *Pipeline) runPipeline(ctx context.Context) {
+	for reports := range p.c {
+		for _, publisher := range p.processors {
+			publisher.ProcessReports(ctx, reports)
+		}
+	}
 }
 
 // serveCORS handles OPTIONS requests by allowing POST requests with a

@@ -31,7 +31,7 @@ import (
 var validNelReportPath = filepath.Clean("../pipelinetest/testdata/reports/valid-nel-report.json")
 
 func TestRespondsToOptionsRequest(t *testing.T) {
-	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
 	request := httptest.NewRequest("OPTIONS", "https://example.com/upload", bytes.NewReader([]byte("")))
 	response := httptest.NewRecorder()
 	pipeline.ServeHTTP(response, request)
@@ -50,7 +50,7 @@ func TestRespondsToOptionsRequest(t *testing.T) {
 }
 
 func TestIgnoreNonPOSTNonOPTIONS(t *testing.T) {
-	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
 	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(testdata(validNelReportPath)))
 	request.Header.Add("Content-Type", "application/reports+json")
 	var response httptest.ResponseRecorder
@@ -62,7 +62,7 @@ func TestIgnoreNonPOSTNonOPTIONS(t *testing.T) {
 }
 
 func TestIgnoreWrongContentType(t *testing.T) {
-	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
 	request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(testdata(validNelReportPath)))
 	request.Header.Add("Content-Type", "application/json")
 	var response httptest.ResponseRecorder
@@ -74,7 +74,7 @@ func TestIgnoreWrongContentType(t *testing.T) {
 }
 
 func TestProcessReports(t *testing.T) {
-	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
 	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
 	p := pipelinetest.PipelineTest{
 		TestName: "TestProcessReports",
@@ -109,7 +109,7 @@ func (g geoAnnotator) ProcessReports(ctx context.Context, batch *collector.Repor
 }
 
 func TestCustomAnnotation(t *testing.T) {
-	pipeline := collector.NewPipeline(pipelinetest.NewSimulatedClock())
+	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
 	pipeline.AddProcessor(&geoAnnotator{})
 	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
 	p := pipelinetest.PipelineTest{
