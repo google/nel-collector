@@ -17,6 +17,8 @@ package collector
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -88,8 +90,15 @@ func setupPipeline(ctx context.Context, clock Clock, bufferSize int64, numWorker
 		wg:    &sync.WaitGroup{},
 	}
 	for i := 0; i < numWorkers; i++ {
-		go p.runPipeline(ctx)
 		p.wg.Add(1)
+		go func() {
+			defer p.wg.Done()
+			for reports := range p.c {
+				for _, publisher := range p.processors {
+					publisher.ProcessReports(ctx, reports)
+				}
+			}
+		}()
 	}
 	return p
 }
@@ -99,26 +108,28 @@ func (p *Pipeline) AddProcessor(processor ReportProcessor) {
 	p.processors = append(p.processors, processor)
 }
 
+var ErrDropped = errors.New("queue full, report dropped")
+
 // ProcessReports extracts reports from a POST upload payload, as defined by the
 // Reporting spec, and runs all of the processors in the pipeline against each
-// report. Returns true if the request was dropped due to a full queue and false
-// otherwise.
-func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r *http.Request) bool {
+// report. Returns ErrDropped if the request was dropped due to a full queue and nil
+// on success. All other errors indicate something wrong with the request.
+func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	if r.Method != "POST" {
 		http.Error(w, "Must use POST to upload reports", http.StatusMethodNotAllowed)
-		return false
+		return fmt.Errorf("Must use POST to upload reports")
 	}
 
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/reports+json" {
 		http.Error(w, "Must use application/reports+json to upload reports", http.StatusBadRequest)
-		return false
+		return fmt.Errorf("Must use application/reports+json to upload reports")
 	}
 
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return false
+		return err
 	}
 
 	clock := p.clock
@@ -135,28 +146,18 @@ func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r 
 	err = decoder.Decode(&reports.Reports)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return false
+		return err
 	}
 
-	var dropped bool
-	select {
-	case p.c <- &reports:
-		dropped = false
-	default:
-		dropped = true
-	}
 	// 204 isn't an error, per-se, but this does the right thing.
 	http.Error(w, "", http.StatusNoContent)
-	return dropped
-}
 
-func (p *Pipeline) runPipeline(ctx context.Context) {
-	for reports := range p.c {
-		for _, publisher := range p.processors {
-			publisher.ProcessReports(ctx, reports)
-		}
+	select {
+	case p.c <- &reports:
+		return nil
+	default:
+		return ErrDropped
 	}
-	p.wg.Done()
 }
 
 // serveCORS handles OPTIONS requests by allowing POST requests with a
