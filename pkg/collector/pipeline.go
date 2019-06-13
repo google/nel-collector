@@ -52,7 +52,8 @@ var defaultClock nowClock
 // Pipeline is a series of processors that should be applied to each report that
 // the collector receives. It uses a fixed number of workers to process the reports
 // and a fixed sized queue that the workers read from. If the queue fills, reports
-// are dropped.
+// are dropped. Pipeline{} is not a usable instance, use NewPipeline for production
+// and NewTestPipeline* in tests.
 type Pipeline struct {
 	processors []ReportProcessor
 	clock      Clock
