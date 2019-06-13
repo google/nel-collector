@@ -32,6 +32,7 @@ var validNelReportPath = filepath.Clean("../pipelinetest/testdata/reports/valid-
 
 func TestRespondsToOptionsRequest(t *testing.T) {
 	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
+	defer pipeline.Close()
 	request := httptest.NewRequest("OPTIONS", "https://example.com/upload", bytes.NewReader([]byte("")))
 	response := httptest.NewRecorder()
 	pipeline.ServeHTTP(response, request)
@@ -51,6 +52,7 @@ func TestRespondsToOptionsRequest(t *testing.T) {
 
 func TestIgnoreNonPOSTNonOPTIONS(t *testing.T) {
 	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
+	defer pipeline.Close()
 	request := httptest.NewRequest("GET", "https://example.com/upload/", bytes.NewReader(testdata(validNelReportPath)))
 	request.Header.Add("Content-Type", "application/reports+json")
 	var response httptest.ResponseRecorder
@@ -63,6 +65,7 @@ func TestIgnoreNonPOSTNonOPTIONS(t *testing.T) {
 
 func TestIgnoreWrongContentType(t *testing.T) {
 	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
+	defer pipeline.Close()
 	request := httptest.NewRequest("POST", "https://example.com/upload/", bytes.NewReader(testdata(validNelReportPath)))
 	request.Header.Add("Content-Type", "application/json")
 	var response httptest.ResponseRecorder
@@ -75,6 +78,7 @@ func TestIgnoreWrongContentType(t *testing.T) {
 
 func TestProcessReports(t *testing.T) {
 	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
+	defer pipeline.Close()
 	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
 	p := pipelinetest.PipelineTest{
 		TestName: "TestProcessReports",
@@ -110,6 +114,7 @@ func (g geoAnnotator) ProcessReports(ctx context.Context, batch *collector.Repor
 
 func TestCustomAnnotation(t *testing.T) {
 	pipeline := collector.NewTestPipeline(pipelinetest.NewSimulatedClock())
+	defer pipeline.Close()
 	pipeline.AddProcessor(&geoAnnotator{})
 	pipeline.AddProcessor(pipelinetest.EncodeBatchAsResult{})
 	p := pipelinetest.PipelineTest{

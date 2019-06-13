@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -56,6 +57,7 @@ type Pipeline struct {
 	processors []ReportProcessor
 	clock      Clock
 	c          chan *ReportBatch
+	wg         *sync.WaitGroup
 }
 
 // NewPipeline creates a new Pipeline with a specified buffer size.
@@ -79,9 +81,14 @@ func NewTestPipelineWithBuffer(clock Clock, bufferSize int64) *Pipeline {
 }
 
 func setupPipeline(ctx context.Context, clock Clock, bufferSize int64, numWorkers int) *Pipeline {
-	p := &Pipeline{clock: clock, c: make(chan *ReportBatch, bufferSize)}
+	p := &Pipeline{
+		clock: clock,
+		c:     make(chan *ReportBatch, bufferSize),
+		wg:    &sync.WaitGroup{},
+	}
 	for i := 0; i < numWorkers; i++ {
 		go p.runPipeline(ctx)
+		p.wg.Add(1)
 	}
 	return p
 }
@@ -127,7 +134,7 @@ func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r 
 	err = decoder.Decode(&reports.Reports)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return true
+		return false
 	}
 
 	var dropped bool
@@ -148,6 +155,7 @@ func (p *Pipeline) runPipeline(ctx context.Context) {
 			publisher.ProcessReports(ctx, reports)
 		}
 	}
+	p.wg.Done()
 }
 
 // serveCORS handles OPTIONS requests by allowing POST requests with a
@@ -167,4 +175,12 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	p.ProcessReports(ctx, w, r)
+}
+
+// Close stops the processing, such that anything in the queue
+// // gets processed, but nothing is added. It then waits until all
+// // processing workers have completed.
+func (p *Pipeline) Close() {
+	close(p.c)
+	p.wg.Wait()
 }

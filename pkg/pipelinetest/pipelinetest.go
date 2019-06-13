@@ -177,9 +177,7 @@ func (p *PipelineTest) Run(t *testing.T) {
 
 				var response httptest.ResponseRecorder
 				p.Pipeline.ProcessReports(context.Background(), &response, request)
-				log.Printf("jarls about to read from channel")
 				batch := <-c
-				log.Printf("jarls read from channel")
 				if response.Code != http.StatusNoContent {
 					t.Errorf("ProcessReports(%s:%s) got status code %d, wanted %d", payloadName, ip.tag, response.Code, http.StatusNoContent)
 					return
@@ -345,9 +343,7 @@ func newExtractReports() *extractReports {
 }
 
 func (e extractReports) ProcessReports(ctx context.Context, batch *collector.ReportBatch) {
-	log.Printf("jarls about to write to channel")
 	e.c <- batch
-	log.Printf("jarls wrote to channel")
 }
 
 func init() {
