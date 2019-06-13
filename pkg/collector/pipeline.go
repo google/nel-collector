@@ -61,7 +61,8 @@ type Pipeline struct {
 	wg         *sync.WaitGroup
 }
 
-// NewPipeline creates a new Pipeline with a specified buffer size.
+// NewPipeline creates a new Pipeline with a specified buffer size
+// and number of workers.
 func NewPipeline(bufferSize int64, numWorkers int) *Pipeline {
 	return setupPipeline(context.Background(), nil, bufferSize, numWorkers)
 }
@@ -72,7 +73,7 @@ const defaultNumWorkers = 10
 // NewTestPipeline creates a new Pipeline with a specified clock.
 // This should only be used for testing.
 func NewTestPipeline(clock Clock) *Pipeline {
-	return setupPipeline(context.Background(), clock, defaultBufferSize, defaultNumWorkers)
+	return NewTestPipelineWithBuffer(clock, defaultBufferSize)
 }
 
 // NewTestPipelineWithBuffer creates a new Pipeline with a specified buffer size and clock.
@@ -168,7 +169,9 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Close stops the processing, such that anything in the queue
 // gets processed, but nothing is added. It then waits until all
-// processing workers have completed.
+// processing workers have completed. All calls to ProcessReports
+// must complete before Close is called, otherwise it will cause
+// a panic.
 func (p *Pipeline) Close() {
 	close(p.c)
 	p.wg.Wait()
