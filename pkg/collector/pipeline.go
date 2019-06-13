@@ -16,10 +16,8 @@ package collector
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -126,24 +124,12 @@ func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r 
 		return fmt.Errorf("Must use application/reports+json to upload reports")
 	}
 
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return err
-	}
-
 	clock := p.clock
 	if clock == nil {
 		clock = defaultClock
 	}
 
-	var reports ReportBatch
-	reports.Time = clock.Now()
-	reports.CollectorURL = *r.URL
-	reports.ClientIP = host
-	reports.ClientUserAgent = r.Header.Get("User-Agent")
-	decoder := json.NewDecoder(r.Body)
-	err = decoder.Decode(&reports.Reports)
+	reports, err := NewReportBatch(r, clock)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return err
@@ -153,7 +139,7 @@ func (p *Pipeline) ProcessReports(ctx context.Context, w http.ResponseWriter, r 
 	http.Error(w, "", http.StatusNoContent)
 
 	select {
-	case p.c <- &reports:
+	case p.c <- reports:
 		return nil
 	default:
 		return ErrDropped
@@ -180,8 +166,8 @@ func (p *Pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Close stops the processing, such that anything in the queue
-// // gets processed, but nothing is added. It then waits until all
-// // processing workers have completed.
+// gets processed, but nothing is added. It then waits until all
+// processing workers have completed.
 func (p *Pipeline) Close() {
 	close(p.c)
 	p.wg.Wait()
