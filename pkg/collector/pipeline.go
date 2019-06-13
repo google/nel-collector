@@ -106,6 +106,7 @@ func (p *Pipeline) AddProcessor(processor ReportProcessor) {
 	p.processors = append(p.processors, processor)
 }
 
+// ErrDropped is returned from ProcessReports when the queue is full and the report is dropped.
 var ErrDropped = errors.New("queue full, report dropped")
 
 // ProcessReports extracts reports from a POST upload payload, as defined by the
