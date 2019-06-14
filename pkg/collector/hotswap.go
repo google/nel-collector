@@ -19,35 +19,52 @@ import (
 	"sync"
 )
 
-// A HotSwap wraps a http.Handler and adds the support for a new handler to
+// HandlerCloser is an interface for a http.Handler that processes data
+// asynchronously and therefore must be closed. Once Close is called,
+// the caller must ensure that no further calls to ServeHTTP are made.
+type HandlerCloser interface {
+	Close()
+	ServeHTTP(http.ResponseWriter, *http.Request)
+}
+
+// A HotSwap wraps a HandlerCloser and adds the support for a new handler to
 // swapped in the middle of execution with no interruption to processing. In
 // this manner, an external listener can load a new configuration, create a new
 // Handler, and call Swap. In a threadsafe manner, the old Handler will be
 // replaced and all future calls to ServeHTTP will use the new version of the
 // handler.
 type HotSwap struct {
-	mux     sync.RWMutex
-	handler http.Handler
+	mu sync.RWMutex
+	hc HandlerCloser
 }
 
 // Swap takes a new Pipeline and atomicly exchanges a new handler for all
-// future processing.
-func (h *HotSwap) Swap(newHandler http.Handler) {
-	h.mux.Lock()
-	defer h.mux.Unlock()
-	h.handler = newHandler
-}
-
-// getHandler safely retrieves the current handler.
-func (h *HotSwap) getHandler() http.Handler {
-	h.mux.RLock()
-	defer h.mux.RUnlock()
-	return h.handler
+// future processing. It ensures that all active calls to ServeHTTP are done
+// and then closes the old Pipeline
+func (h *HotSwap) Swap(hc HandlerCloser) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.hc != nil {
+		h.hc.Close()
+	}
+	h.hc = hc
 }
 
 // ServeHTTP delegates incoming requests to the contained handler in a thread
 // safe manner.
 func (h *HotSwap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	handler := h.getHandler()
-	handler.ServeHTTP(w, r)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	h.hc.ServeHTTP(w, r)
+}
+
+// Close closes the contained HandlerCloser, first ensuring that all in-progress
+// calls to ServeHTTP have completed. It is up to the caller to ensure that no
+// calls to ServeHTTP are made after this function has started.
+func (h *HotSwap) Close() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.hc != nil {
+		h.hc.Close()
+	}
 }

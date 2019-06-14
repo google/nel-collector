@@ -51,3 +51,4 @@ type dummyHandler struct {
 func (d dummyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(d.statusCode)
 }
+func (d dummyHandler) Close() {}
