@@ -24,7 +24,7 @@ import (
 // the caller must ensure that no further calls to ServeHTTP are made.
 type HandlerCloser interface {
 	Close()
-	ServeHTTP(http.ResponseWriter, *http.Request)
+	http.Handler
 }
 
 // A HotSwap wraps a HandlerCloser and adds the support for a new handler to
