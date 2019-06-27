@@ -13,6 +13,11 @@
   },
   "ClientIP": "2001:db8::2",
   "ClientUserAgent": "",
+  "Header": {
+    "Content-Type": [
+      "application/reports+json"
+    ]
+  },
   "Annotations": {
     "ClientCountry": ""
   },

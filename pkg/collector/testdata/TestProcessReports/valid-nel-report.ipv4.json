@@ -13,6 +13,11 @@
   },
   "ClientIP": "192.0.2.1",
   "ClientUserAgent": "",
+  "Header": {
+    "Content-Type": [
+      "application/reports+json"
+    ]
+  },
   "Annotations": null,
   "Reports": [
     {
