@@ -187,6 +187,11 @@ type ReportBatch struct {
 	// The user agent of the client that uploaded the batch of reports.
 	ClientUserAgent string
 
+	// The key-value pairs of the HTTP header that is received by the collector.
+	// This can be used to get additional information. One example is to get the
+	// remote address of the client when the collector runs behind a proxy.
+	Header http.Header
+
 	// An arbitrary set of extra data that you can attach to this batch of
 	// reports.
 	Annotations
@@ -205,6 +210,7 @@ func NewReportBatch(r *http.Request, clock Clock) (*ReportBatch, error) {
 	reports.CollectorURL = *r.URL
 	reports.ClientIP = host
 	reports.ClientUserAgent = r.Header.Get("User-Agent")
+	reports.Header = r.Header
 	decoder := json.NewDecoder(r.Body)
 	err = decoder.Decode(&reports.Reports)
 	if err != nil {
